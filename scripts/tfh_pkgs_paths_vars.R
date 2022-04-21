@@ -1,5 +1,5 @@
 # set the path to the top directory
-tfh_working_dir <-'Z:/ResearchHome/Groups/thomagrp/home/sschattg/bioinformatics_projects/flu_vaxx_tfh'
+tfh_working_dir <- 'path/to/repository'
 
 library(data.table, quietly =T)
 library(tidyverse, quietly =T)

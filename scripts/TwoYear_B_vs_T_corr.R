@@ -17,7 +17,7 @@ Tfh_only <- readRDS( Tfh_lineages_path )
 # colnames(B_tally)[4] <- 'subset'
 # write.csv(B_tally, 'outs/TwoYear_LN_Bcell_freq_time.csv')
 
-B_tally <- read.csv('outs/TwoYear_LN_Bcell_freq_time.csv')
+B_tally <- read.csv('data/TwoYear_LN_Bcell_freq_time.csv')
 
 B_tally <- B_tally %>% 
   filter(tissue == 'FNA') %>%
