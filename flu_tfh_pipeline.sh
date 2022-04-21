@@ -1,5 +1,4 @@
 #!/bin/bash
-cd path/to/repository
 mkdir outs
 Rscript scripts/setup.R
 
