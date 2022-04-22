@@ -24,12 +24,12 @@ library(ggplotify, quietly = T)
 `%notlike%` <- Negate(`%like%`)
 
 # paths 
-all_cells_path <- paste0( tfh_working_dir, '/data/TwoYear_all_cells.rds')
-Tcells_path <- paste0( tfh_working_dir, '/data/TwoYear_Tcells.rds')
-Bcells_path <- paste0( tfh_working_dir, '/data/TwoYear_Bcells.rds')
-Tfh_lineages_path <- paste0( tfh_working_dir, '/data/TwoYear_Tfh_lineages.rds')
-Tfh_only_path <- paste0( tfh_working_dir, '/data/TwoYear_Tfh_only.rds')
-clone_df_path <- paste0( tfh_working_dir,'/data/TwoYear_10x_clones.tsv')
+all_cells_path <-'/data/TwoYear_all_cells.rds'
+Tcells_path <-'/data/TwoYear_Tcells.rds'
+Bcells_path <- '/data/TwoYear_Bcells.rds'
+Tfh_lineages_path <- '/data/TwoYear_Tfh_lineages.rds'
+Tfh_only_path <- '/data/TwoYear_Tfh_only.rds'
+clone_df_path <- '/data/TwoYear_10x_clones.tsv'
 IgTcr <- read.delim( "data/Human_10X_IgTcr.tsv", stringsAsFactors = F)
 
 # color palettes

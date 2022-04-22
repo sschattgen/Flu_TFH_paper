@@ -3,10 +3,37 @@
 source('scripts/tfh_pkgs_paths_vars.R')
 setwd(tfh_working_dir)
 
-# import the T cell object ====
+# Rebuild the T cell only object ====
+gexFiles <- Read10X_h5('data/TwoYear_Tcells_counts.h5')
+Tcells <-  CreateSeuratObject( gexFiles )
+Tcells@meta.data <- read.csv('data/TwoYear_Tcells_initial_metadata.csv', row.names = 1)
+  
+# normalize and var features
+Tcells <- NormalizeData( Tcells)
+Tcells <- FindVariableFeatures(object = Tcells)
+Tcells_var_genes <- VariableFeatures(Tcells)
+Tcells_PC_genes <- Tcells_var_genes[-which(Tcells_var_genes %in% IgTcr$genes)] 
+#Tcells <- ScaleData(object = Tcells,  features = rownames(Tcells) )
 
-#Tcells <- readRDS('./10x/objects/Ali_bothDonors_Tcells.rds') #This was processed the same way, the cluster names were just a bit different
-Tcells <- readRDS( Tcells_path )
+## scoring cell cycle 
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+Tcells <- CellCycleScoring(Tcells, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+Tcells$CC.Difference <- Tcells$S.Score - Tcells$G2M.Score
+
+## but not regressing out here 
+Tcells <- ScaleData(object = Tcells, 
+                    features = rownames(Tcells) )
+
+## dim reductions
+Tcells <- RunPCA(object = Tcells, features = Tcells_PC_genes )
+Tcells <- FindNeighbors(object = Tcells)
+Tcells <- FindClusters(object = Tcells)
+Tcells <- RunUMAP(object = Tcells , dims = 1:20)
+
+# stash the idents and umis in metadata for later
+Tcells@meta.data$ident <- Tcells@active.ident
+
 
 # start by annotating clusters ----
 umaps1 <- (DimPlot(Tcells, label = T) |  
@@ -82,7 +109,6 @@ Tcells@active.ident <- factor(Tcells@active.ident, levels = clusterorder )
 Tcells@meta.data$ident <- Tcells@active.ident  
 Tcells@meta.data$Tcell_type <-  factor( Tcells@meta.data$Tcell_type, levels =  c('naive','MAIT/NKT','effector/memory','Tfh') )
 
-
 # Find T cell cluster markers ====
 
 TMarkers <- FindAllMarkers(Tcells )
@@ -99,4 +125,3 @@ write_tsv(TMarkers, 'outs/TwoYear_Tcell_markers.tsv')
 
 #save updated T cell object ----
 saveRDS(Tcells , Tcells_path )
-

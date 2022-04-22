@@ -3,7 +3,7 @@
 
 source('scripts/tfh_pkgs_paths_vars.R')
 setwd(tfh_working_dir)
-
+library(DropletUtils)
 # make Seurat object. This is the highest level with all cells ====
 
 # generate Seurat object
@@ -245,34 +245,17 @@ Tcells <- subset(Both_sc, subset = ident %in% Tcells_clust &
 DimPlot(Tcells)
 ncol(Tcells)
 
-# normalize and var features
-Tcells <- NormalizeData( Tcells)
-Tcells <- FindVariableFeatures(object = Tcells)
-Tcells_var_genes <- VariableFeatures(Tcells)
-Tcells_PC_genes <- Tcells_var_genes[-which(Tcells_var_genes %in% IgTcr$genes)] 
-#Tcells <- ScaleData(object = Tcells,  features = rownames(Tcells) )
+#export the T cells counts matrix and metadata ====
 
-## scoring cell cycle 
-s.genes <- cc.genes$s.genes
-g2m.genes <- cc.genes$g2m.genes
-Tcells <- CellCycleScoring(Tcells, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
-Tcells$CC.Difference <- Tcells$S.Score - Tcells$G2M.Score
-
-## but not regressing out here 
-Tcells <- ScaleData(object = Tcells, 
-                    features = rownames(Tcells) )
-
-## dim reductions
-Tcells <- RunPCA(object = Tcells, features = Tcells_PC_genes )
-Tcells <- FindNeighbors(object = Tcells)
-Tcells <- FindClusters(object = Tcells)
-Tcells <- RunUMAP(object = Tcells , dims = 1:20)
-
-# stash the idents and umis in metadata for later
-Tcells@meta.data$ident <- Tcells@active.ident
-
-## Save the full and T cell objects ==== 
+write10xCounts('data/TwoYear_Tcells_counts.h5',
+               x = Tcells@assays$RNA@counts,
+               gene.id = rownames(Tcells), 
+               barcodes = colnames(Tcells), 
+               version='3')
+write.csv(Tcells@meta.data, 'data/TwoYear_Tcells_initial_metadata.csv')               
+                
+## Save the full object ==== 
 saveRDS(Both_sc , all_cells_path )
-saveRDS(Tcells , Tcells_path )
+
 
 
