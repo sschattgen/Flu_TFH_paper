@@ -4,7 +4,7 @@ This R code will run the entire workflow beginning after preprocessing and subse
 
 ## How to run full workflow (assumes you have R installed)
 1. Clone this repository
-2. Download the the dataset from Zenodo [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6476022.svg)](https://doi.org/10.5281/zenodo.6476022)
+2. Download the the dataset from Zenodo [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8306140.svg)](https://doi.org/10.5281/zenodo.8306140)
 3. Unpack with `tar -xzvf flu_vaxx_v2_dataset.tar.gz` and move the `data` folder to the cloned repo from step 1.
 4. Open `scripts/tfh_pkg_paths_vars.R` and replace `path/to/repository` on line 2 with the path to the repo and data 
 
