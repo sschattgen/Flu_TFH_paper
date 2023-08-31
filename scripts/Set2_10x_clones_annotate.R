@@ -1,25 +1,25 @@
 # this script generates table of clonotype data for all cells in the BothDonors_Tcells dataset 
 # match to sc and bulk rep data and associated plots
 
-source('scripts/tfh_pkgs_paths_vars.R')
+source('Z:/ResearchHome/ResearchHomeDirs/thomagrp/sschattg/bioinformatics_projects/Ali_Tfh/scripts/tfh_pkgs_paths_vars.R')
 setwd(tfh_working_dir)
 
 # import T cell seurat object, and the scPCR and bulk data ----
 
-Tcells <- readRDS(Tcells_path)
+Tcells <- readRDS(Set2_integrated_Tcells_path)
 
 # paired scPCR and bulk data from sorted Tfh cells
-pairedSC <- read.delim('data/Ali_paired_sc_clones_JCC283.tsv', 
+pairedSC <- read.delim('./repdata/sc/clone_tables/Ali_paired_sc_clones_JCC283.tsv', 
                        stringsAsFactors = F)
 
-bulk_clones.vdj <- read.delim("data/Ali_bulk_allDonor_clones.tsv", 
+bulk_clones.vdj <- read.delim("./repdata/bulk/clone_tables/Ali_bulk_allDonor_clones.tsv", 
                               stringsAsFactors = F)
 
 # generate a clone_df from the Tcells metadata ====
 
 Clonedf <- makeClonedf(Tcells, 
                        stripAlleles = TRUE, 
-                       other_metadata =  c( "donor", "time", "year", 
+                       other_metadata =  c( "donor", "time_point", "year", 
                                             "day", "tissue", "Tcell_type", 
                                             "strict.match.cdr")
                        )
@@ -103,7 +103,7 @@ ctClusterJitter <- ggplot(countident, aes(ident, log10(1 +count_cluster))) + geo
   theme(legend.position = "none", axis.text.x = element_text(angle = 90)) 
 
 csize_plot <- (ctClusterUMAP / ctClusterJitter) + plot_layout(heights = c(2,1))
-ggsave('outs/TwoYear_Tcell_cloneSizes.png', plot = csize_plot, height = 10, width = 7)
+ggsave('./10x/outs/Set2_Tcell_cloneSizes.png', plot = csize_plot, height = 10, width = 7)
 
 
 # plot the top100clones and their cluster freq
@@ -127,7 +127,7 @@ TopSplitCluster <- ggplot(TopIdent , aes(clone_id, freq, fill = ident)) +
         legend.position = "bottom" ) 
 
 TopSplitCluster
-ggsave('outs/TwoYear_TopClones_clusters.png', height = 5, width = 20)
+ggsave('./10x/outs/Set2_TopClones_clusters.png', height = 5, width = 20)
 
 
 # match to paired single cell sorted data ----
@@ -172,7 +172,7 @@ d5_match_scPCR_UMAP <- ggplot(Clonedf) +
   labs(title = "Clone match to paired scPCR from Donor 321-05")
 
 d4_match_scPCR_UMAP | d5_match_scPCR_UMAP
-ggsave('outs/TwoYear_scPCR_pairedMatch.png', height = 6.5, width = 12)
+ggsave('./10x/outs/Set2_scPCR_pairedMatch.png', height = 6.5, width = 12)
 
 # bulk TCRs -----
 #match the bulk back to seurat object
@@ -253,13 +253,13 @@ d5_match_beta_col <- ggplot( Clonedf ,aes(x = ident, y = freq_cluster, fill = ma
 (d4_match_alpha_UMAP | d4_match_beta_UMAP | d5_match_alpha_UMAP | d5_match_beta_UMAP) / 
   (d4_match_alpha_col | d4_match_beta_col | d5_match_alpha_col | d5_match_beta_col)
 
-ggsave('outs/TwoYear_bulk_matched_chains.png', height = 10, width = 22)
+ggsave('./10x/outs/Set2_bulk_matched_chains.png', height = 10, width = 22)
 
 
 # add the picked clones from the original analysis ====
 
 # the one year picked clones sheet
-pickedClones_yr1 <- read.csv('data/Donor_321-05_pickedClones_yr1.csv', stringsAsFactors = F)
+pickedClones_yr1 <- read.csv('./10x/outs/Donor_321-05_pickedClones_yr1.csv', stringsAsFactors = F)
 
 pickedClones_yr1_short <- pickedClones_yr1 %>%
   mutate(strict.match.cdr = paste(va_gene, cdr3a, ja_gene,
@@ -285,4 +285,4 @@ Tcells <- AddMetaData( Tcells, metadata = counts_log, col.name = 'clone_size_log
 # save the Clonedf and Tcells ====
 
 write_tsv( Clonedf , clone_df_path )
-saveRDS(Tcells , Tcells_path )
+saveRDS(Tcells , Set2_integrated_Tcells_path )

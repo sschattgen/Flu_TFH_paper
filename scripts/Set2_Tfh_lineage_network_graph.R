@@ -1,47 +1,36 @@
-# 
-source('scripts/tfh_pkgs_paths_vars.R')
+# Run Hyunjin's pipeline
+source('Z:/ResearchHome/Groups/thomagrp/home/sschattg/bioinformatics_projects/Ali_Tfh/scripts/tfh_pkgs_paths_vars.R')
 setwd(tfh_working_dir)
-library(igraph)
-library(RedeR)
-
+map <- purrr::map
 # make clone lineage pivot table spread by time
-Clonedf <- read.delim(clone_df_path, stringsAsFactors = F)
 
-tfh_freq_allivium_df <- Clonedf %>%
-  select(donor, time, tissue, clone_id, Tfh_type) %>%
-  group_by_all() %>%
-  tally() %>%
-  ungroup(clone_id, Tfh_type) %>%
-  mutate(freq = n / sum(n)) %>%
-  ungroup() %>%
-  filter(!is.na(Tfh_type)) %>%
-  mutate(time = factor( time, levels = time_levels)) 
-
-lineage_table_d5 <- tfh_freq_allivium_df %>%
-  filter(donor == '321-05') %>%
-  select(clone_id, time, tissue, n  ) %>%
-  mutate(time = gsub('_d','-d', time)) %>% 
-  pivot_wider(values_from = 'n', names_from = 'time') %>%
-  mutate(across(where(is.integer), ~ nafill(., fill = 0)))
-
-colnames(lineage_table_d5)[2] <- 'cell_type'
-
-lineage_table_d4 <- tfh_freq_allivium_df %>%
-  filter(donor == '321-04') %>%
-  select(clone_id, time, tissue, n  ) %>%
-  mutate(time = gsub('_d','-d', time)) %>% 
-  pivot_wider(values_from = 'n', names_from = 'time') %>%
-  mutate(across(where(is.integer), ~ nafill(., fill = 0)))
-colnames(lineage_table_d4)[2] <- 'cell_type'
+make_wide_lineages <- function(df){
+  df %>%
+    select( clone_id, time_point, tissue, n  ) %>%
+    mutate(time = gsub('_d','-d', time_point)) %>% 
+    pivot_wider(values_from = 'n', names_from = 'time',  values_fill = 0) %>%
+    mutate(across(where(is.integer), ~ nafill(., fill = 0))) %>%
+    dplyr::rename(cell_type = tissue)
+}
 
 #lin network function
 draw_lineage_network <- function(lineage_table,
                                  by.time=TRUE) {
   
   ### load library
+  if(!require(igraph, quietly = TRUE)) {
+    install.packages("igraph")
+    require(igraph, quietly = TRUE)
+  }
+  if(!require(RedeR, quietly = TRUE)) {
+    if (!requireNamespace("BiocManager", quietly = TRUE))
+      install.packages("BiocManager")
+    BiocManager::install("RedeR")
+    require(RedeR, quietly = TRUE)
+  }
   
   ### get time points
-  time_points <- colnames(lineage_table)[3:(ncol(lineage_table))]
+  time_points <- colnames(lineage_table)[4:(ncol(lineage_table))]
   
   ### if by.time = TRUE
   if(by.time) {
@@ -160,6 +149,29 @@ draw_lineage_network <- function(lineage_table,
   
 }
 
-# draw lineages
-draw_lineage_network(lineage_table_d4)
-draw_lineage_network(lineage_table_d5)
+#make lineage input ====
+Clonedf <- read.delim(clone_df_path, stringsAsFactors = F) %>%
+  mutate(Tfh_type2 = ifelse(Tfh_type == 'Treg' | is.na(Tfh_type), NA, 'Tfh')) %>%
+  filter(!is.na(day))
+
+tfh_freq_allivium_df <- Clonedf %>%
+  select(donor, time_point, tissue, clone_id, Tfh_type2) %>%
+  group_by_all() %>%
+  tally() %>%
+  ungroup(clone_id, Tfh_type2) %>%
+  mutate(freq = n / sum(n)) %>%
+  ungroup() %>%
+  filter(!is.na(Tfh_type2)) %>%
+  mutate(time_point = factor( time_point, levels = names(TimePal2))) 
+
+split_clone_freq_list <- tfh_freq_allivium_df %>%
+  group_by(donor) %>%
+  group_split()
+
+lineage_dfs <- map( split_clone_freq_list, ~make_wide_lineages(.))
+
+# draw lineages====
+draw_lineage_network(lineage_dfs[[1]])
+draw_lineage_network(lineage_dfs[[2]])
+draw_lineage_network(lineage_dfs[[3]])
+draw_lineage_network(lineage_dfs[[4]])

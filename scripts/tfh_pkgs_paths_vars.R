@@ -23,37 +23,50 @@ library(ggplotify, quietly = T)
 `%notin%` <- Negate(`%in%`)
 `%notlike%` <- Negate(`%like%`)
 
-# paths 
-all_cells_path <-'/data/TwoYear_all_cells.rds'
-Tcells_path <-'/data/TwoYear_Tcells.rds'
-Bcells_path <- '/data/TwoYear_Bcells.rds'
-Tfh_lineages_path <- '/data/TwoYear_Tfh_lineages.rds'
-Tfh_only_path <- '/data/TwoYear_Tfh_only.rds'
-clone_df_path <- '/data/TwoYear_10x_clones.tsv'
-IgTcr <- read.delim( "data/Human_10X_IgTcr.tsv", stringsAsFactors = F)
+
+tfh_working_dir <-'.'
+#IgTcr <- read.delim( "data/Human_10X_IgTcr.tsv", stringsAsFactors = F)
+
+# # for large dataset with donors 321-04 and 321-05 over two years
+# all_cells_path <- paste0( tfh_working_dir, '/10x/objects/TwoYear_all_cells.rds')
+# Tcells_path <- paste0( tfh_working_dir, '/10x/objects/TwoYear_Tcells.rds')
+# Bcells_path <- paste0( tfh_working_dir, '/10x/objects/TwoYear_Bcells.rds')
+# Tfh_lineages_path <- paste0( tfh_working_dir, '/10x/objects/TwoYear_Tfh_lineages.rds')
+# #Tfh_only_path <- paste0( tfh_working_dir, '/10x/objects/TwoYear_Tfh_only.rds')
+ clone_df_path <- paste0( tfh_working_dir,'data/Set2_10x_clones.tsv')
+
+# for smaller dataset with donors 321-07 and 321-08. 2 x PMBC and 1 FNA time point per donor
+Set2_integrated_Tcells_path <- paste0( tfh_working_dir, 'data/intergrated_Tcells_harmony_bydonor.rds')
+Set2_integrated_Tfh_path <- paste0( tfh_working_dir, 'data/intergrated_Tfh_harmony_bydonor.rds')
+Set2_integrated_CD4_path <- paste0( tfh_working_dir, 'data/intergrated_CD4_harmony_bydonor.rds')
+
+# for smaller dataset with additional PBMC CD4 T cell sequencing for 321-05 on day 5 year 1 
+d05_Tcells_path <- paste0( tfh_working_dir, '/10x/objects/d05_add_PBMC_Tcells.rds')
+
+
 
 # color palettes
-DonorPal <-jcolors('default')[c(1:3)]
-names(DonorPal) <- c('321-04','321-05','321-11')
+DonorPal <-jcolors('default')
+names(DonorPal) <- c('321-04','321-05','321-11','321-07','321-08')
 
 TissuePal <- c('#005B94', '#D12600')
 names(TissuePal) <- c('FNA', 'PBMC')
 
-TimePal <- viridis::viridis(10, option = "D")
-names(TimePal) <- c('0','5', '7', '12','14', '28','60','90','120','180')
+TimePal <- viridis::viridis(11, option = "D")
+names(TimePal) <- c('0','5', '7', '12','14', '26','28','60','90','120','180')
 
 YearPal <- c("#FF8811","#9DD9D2")
 names(YearPal) <- c('1','2')
 
 
-time_levels <- c( "y1_d0", "y1_d5", "y1_d12", "y1_d28", "y1_d60", "y1_d90",  "y1_d120", "y1_d180", 
+time_levels <- c( "y1_d0", "y1_d5", "y1_d12", "y1_d26", "y1_d28", "y1_d60", "y1_d90",  "y1_d120", "y1_d180", 
                   "y2_d0", "y2_d7", "y2_d14", "y2_d28", "y2_d60", "y2_d90", "y2_d120" )
 
-TimePal2 <- viridis::viridis(15, option = "D")
+TimePal2 <- viridis::viridis(16, option = "D")
 names(TimePal2) <- time_levels
 
-TfhPal <- jcolors('pal9')[1:3]
-names(TfhPal) <- c('pre/memory', 'GC', 'IL10 TFH' )
+TfhPal <- jcolors('pal9')[c(1:3,6)]
+names(TfhPal) <- c('pre/memory', 'GC', 'IL10 TFH', 'Treg' )
 
 good_conga_clusters <- c("10,1", "10,4", "8,0",  "8,14", "8,15", "8,18", "8,7",  "8,9" )
 conga_cluster_pal <-c(jcolors("rainbow")[c(1,8,7,2,3,6,4,5)])
@@ -67,9 +80,6 @@ for (i in seq(12)){
   picked_ID <- append(picked_ID, cip)
 }
 names(clonePal) <- c( picked_ID, 'other')
-
-flu_pal <- c('grey80', 'red')
-names(flu_pal)<- c('unknown', 'yes')
 
 #functions used in the workflow ====
 
@@ -267,9 +277,9 @@ detectUnconventionals <- function(df, species){
            MHCi_score_cdr3b = fgloop_cdr3b_length + 3*fgloop_cdr3b_cys_count + 2*fgloop_cdr3b_try_count + 
              fgloop_cdr3b_arg_count + fgloop_cdr3b_lys_count + 0.5*fgloop_cdr3b_his_count - 
              fgloop_cdr3b_asp_count - fgloop_cdr3b_glu_count 
-           ) %>%
+    ) %>%
     mutate(MHCi = MHCi_score_cdr3a + 2*MHCi_score_cdr3b)
-
+  
   #detects MAIT and NKT invariant alpha chains
   
   scall <- str_to_lower(species)
@@ -297,7 +307,7 @@ detectUnconventionals <- function(df, species){
   mmait_j <- c("TRAJ33") 
   mnkt_v <- c("TRAV11") 
   mnkt_j <- c("TRAJ18") 
-
+  
   
   if ( scall == "mouse"){
     
@@ -321,3 +331,4 @@ detectUnconventionals <- function(df, species){
   return(df2)
   
 }
+

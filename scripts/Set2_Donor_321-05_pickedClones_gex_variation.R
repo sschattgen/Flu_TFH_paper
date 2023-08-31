@@ -1,19 +1,25 @@
 # BothDonor clonotype analysis 
 # the alluvial plots of clonal lineage abundance for the picked clones is in here, too
 
-source('scripts/tfh_pkgs_paths_vars.R')
+source('Z:/ResearchHome/Groups/thomagrp/home/sschattg/bioinformatics_projects/Ali_Tfh/scripts/tfh_pkgs_paths_vars.R')
 setwd(tfh_working_dir)
 
 #
-Tfh_obj <- readRDS(Tfh_lineages_path)
+Tfh_obj <- readRDS(Set2_integrated_Tfh_path)
+Tfh_obj@meta.data$day <- factor(Tfh_obj@meta.data$day, levels = names(TimePal))
+Tfh_obj@meta.data$time_point <- factor(Tfh_obj@meta.data$time, levels = names(TimePal2))
+
 Clonedf <- read.delim( clone_df_path , stringsAsFactors = F)
 
 # import clone_df and Tfh obj ==== 
-pc_obj <- subset(Tfh_obj, 
-                 subset = Tfh_clone_id != 'other' ) # remove cycling cells
+ccells <- Tfh_obj@meta.data %>%
+  filter(!is.na(Tfh_clone_id)) %>%
+  rownames()
 
+pc_obj <- subset(Tfh_obj, cells = ccells) 
 
 pc_obj@meta.data %>% filter(Tfh_clone_id =='Tfh_321-05_clone_3') %>% group_by(tissue) %>% tally()
+DefaultAssay(pc_obj) <- 'RNA'
 pc_obj <- SeuratReprocess(pc_obj)
 pc_obj@meta.data$ident <- pc_obj@active.ident
 
@@ -26,8 +32,8 @@ pc_degs <- pc_markers %>%
   group_by(cluster)%>%
   slice_min(n = 10, order_by = p_val_adj)
 
-saveRDS(pc_obj, 'data/TwoYear_Donor_321-05_pickedClones.rds')
-write_csv(pc_markers, 'outs/TwoYear_Donor_321-05_pickedClones_markers.csv')
+saveRDS(pc_obj, './10x/objects/Set2_Donor_321-05_pickedClones.rds')
+write_csv(pc_markers, './10x/outs/Set2_Donor_321-05_pickedClones_markers.csv')
 
 # plotting
 gex_clust_pal <- wes_palette("Darjeeling1")[1:3]
@@ -73,7 +79,7 @@ pc_umap_panel <- pc_umap +
   pc_tissue + 
   pc_tfh
 
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClone_umaps.png', plot = pc_umap_panel,
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClone_umaps.png', plot = pc_umap_panel,
        height = 10, width = 15)
 
 long_pca <- DimPlot(pc_obj, group.by = 'Tfh_clone_id', pt.size = 3, split.by = 'day', reduction = 'pca')+ 
@@ -84,7 +90,7 @@ long_pca_tissue <- DimPlot(pc_obj, group.by = 'tissue', pt.size = 3, split.by = 
   scale_color_manual(values = TissuePal) +
   labs(title =  'Picked clonotypes') 
 
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClone_pca_time.png', plot = long_pca,
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClone_pca_time.png', plot = long_pca,
        height = 4, width = 18)
 
 
@@ -100,7 +106,7 @@ fancy_pca <- ggplot(pca_df, aes(PC_2, PC_1, color = tissue, fill = Tfh_clone_id 
   theme_minimal_grid() +
   facet_grid(year ~ day) 
 
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClone_fancy_pca_time.pdf', 
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClone_fancy_pca_time.pdf', 
        plot = fancy_pca,
        height = 5, width = 18, useDingbats = F)
 
@@ -125,7 +131,7 @@ fancy_pca2 <- ggplot(pca_df2, aes(Tfh_clone_id, PC_1, fill = Tfh_clone_id )) +
   facet_grid(~time) +
   theme(axis.text.x = element_blank(),
         axis.title.x = element_blank())
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClone_fancy_pca_time_PC1_only.pdf', 
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClone_fancy_pca_time_PC1_only.pdf', 
        plot = fancy_pca2,
        height = 5, width = 18, useDingbats = F)
 
@@ -142,9 +148,9 @@ ann_colors = list(
   Tfh_type =TfhPal
 )
 # annotation metadata
-sample_col <- FetchData(pc_obj, c('Tfh_clone_id', 'flu_specific' , 'year', 'day', 'tissue', 'time','Tfh_type')) %>%
-  arrange( time , Tfh_clone_id)%>%
-  select(-time)
+sample_col <- FetchData(pc_obj, c('Tfh_clone_id', 'flu_specific' , 'year', 'day', 'tissue', 'time_point','Tfh_type'))%>%
+  arrange( time_point , Tfh_clone_id)%>% 
+  select(-time_point)
 colnames(sample_col)[1:2] <- c('Clone ID', 'Flu specific')
 sample_md <- sample_col %>% 
   select(`Clone ID`, `Flu specific`, Tfh_type, tissue, day, year)
@@ -198,7 +204,7 @@ pc_hm <- pheatmap(picked_degs_scale_data,
                   show_colnames  = FALSE, gaps_col= gaps_col) %>%
   as.ggplot(.)
 
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClone_picked_marker_hm.pdf', plot = pc_hm,
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClone_picked_marker_hm.pdf', plot = pc_hm,
        height = 8, width = 13, useDingbats = F)
 
 # now let's use the head an tail loadings for PC1
@@ -222,7 +228,7 @@ pc_hm2 <- pheatmap(degs_scale_data,
                   show_colnames  = FALSE, gaps_col= gaps_col) %>%
   as.ggplot(.)
 
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClone_PC_marker_hm.pdf', plot = pc_hm2,
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClone_PC_marker_hm.pdf', plot = pc_hm2,
        height = 8, width = 13, useDingbats = F)
 
 
@@ -292,18 +298,19 @@ for ( i in seq_along(lineages)){
   
   
 }
+
 lineage_hm_lay <- wrap_plots(picked_lineage_hm) 
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClones_lineages_picked_markers_hm.pdf', plot = lineage_hm_lay,
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClones_lineages_picked_markers_hm.pdf', plot = lineage_hm_lay,
        height = 12.5, width = 17, useDingbats = F)
 PC_lineage_hm_lay <- wrap_plots(PC_lineage_hm) 
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClones_lineages_PC_markers_hm.pdf', plot = PC_lineage_hm_lay,
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClones_lineages_PC_markers_hm.pdf', plot = PC_lineage_hm_lay,
        height = 12.5, width = 17, useDingbats = F)
 
 # alluvial plot for all the pickedClones with 10x data ====
 
 day_split <- Clonedf %>% 
   filter(donor == '321-05') %>%
-  select(donor, tissue, time, Tfh_clone_id) %>%
+  select(donor, tissue, time_point, Tfh_clone_id) %>%
   group_by_all() %>%
   tally() %>%
   ungroup(Tfh_clone_id) %>%
@@ -323,9 +330,12 @@ merged_picked_clones <- do.call( rbind, day_split_freq) %>%
   group_by(tissue) %>%
   group_split()
 FNA_df <- merged_picked_clones[[1]]
+PBMC_df <- merged_picked_clones[[2]]
+PBMC_df$time_point <- factor(PBMC_df$time_point, levels = names(TimePal2))
+FNA_df$time_point <- factor(FNA_df$time_point, levels = names(TimePal2))
 FNA_df$blood <- ifelse(FNA_df$Tfh_clone_id %in% merged_picked_clones[[2]]$Tfh_clone_id, 'yes', 'no')
 new_pc_df <- bind_rows(FNA_df, merged_picked_clones[[2]]) 
-new_pc_df$time <- factor(new_pc_df$time, levels = names(TimePal2))
+new_pc_df$time_point <- factor(new_pc_df$time_point, levels = names(TimePal2))
 new_pc_df$tissue <- factor(new_pc_df$tissue, levels = c('PBMC','FNA'))
 
 bloodpal <- c(TissuePal[2], 'black')
@@ -333,7 +343,7 @@ names(bloodpal) <- c('yes', 'no')
 
 # alluvial plots
 picked_pl_all <- ggplot(data = new_pc_df,
-       aes(x = time, 
+       aes(x = time_point, 
            y = n, 
            alluvium = Tfh_clone_id)) +
   geom_alluvium(aes(fill = Tfh_clone_id, color = blood),
@@ -348,13 +358,14 @@ picked_pl_all <- ggplot(data = new_pc_df,
   scale_color_manual(values = bloodpal) + 
   scale_y_continuous(limits = c(0,60), breaks = c(0,10,20,30,40,50,60))+
   facet_wrap(~tissue, ncol = 1)
-ggsave('outs/TwoYear_BothDonors_321-05_pickedClone_clone_numbers_LN_PBMC.pdf', 
+
+ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_clone_numbers_LN_PBMC.pdf', 
        plot = picked_pl_all,
        height = 12, width = 12, useDingbats = F)
 
 
 picked_pl_FNA <- ggplot(data = filter(new_pc_df, tissue == 'FNA'),
-                        aes(x = time, 
+                        aes(x = time_point, 
                             y = freq, 
                             alluvium = Tfh_clone_id)) +
   geom_alluvium(aes(fill = Tfh_clone_id, color = blood),
@@ -370,12 +381,12 @@ picked_pl_FNA <- ggplot(data = filter(new_pc_df, tissue == 'FNA'),
   scale_fill_manual(values = clonePal) +
   scale_color_manual(values = bloodpal)
 
-ggsave('outs/TwoYear_BothDonors_321-05_pickedClone_clone_freqs.pdf', 
+ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_clone_freqs.pdf', 
        plot = picked_pl_FNA,
        height = 6, width = 12, useDingbats = F)
 
-picked_pl_blood <- ggplot(data = filter(new_pc_df, tissue == 'PBMC'),
-                        aes(x = time, 
+picked_pl_blood <- ggplot(data = PBMC_df,
+                        aes(x = time_point, 
                             y = freq, 
                             alluvium = Tfh_clone_id)) +
   geom_alluvium(aes(fill = Tfh_clone_id),
@@ -385,14 +396,15 @@ picked_pl_blood <- ggplot(data = filter(new_pc_df, tissue == 'PBMC'),
                 size = 0.7) +
   theme_minimal()+
   labs(title = 'Frequency of clones picked for cloning in PBMC',
-       subtitle = paste0(unique(new_pc_df$donor), 
-                         " PBMC")) +
+       subtitle = paste0(unique(PBMC_df$donor), 
+                         " ", 
+                         unique(PBMC_df$tissue))) +
   ylab('Relative frequency for tissue and day') +
   scale_fill_manual(values = clonePal) +
   scale_color_manual(values = bloodpal)
 
 picked_pl_FNA_n <- ggplot(data = FNA_df,
-                          aes(x = time, 
+                          aes(x = time_point, 
                               y = n, 
                               alluvium = Tfh_clone_id)) +
   geom_alluvium(aes(fill = Tfh_clone_id, color = blood),
@@ -407,7 +419,7 @@ picked_pl_FNA_n <- ggplot(data = FNA_df,
   scale_fill_manual(values = clonePal)+
   scale_color_manual(values = bloodpal)
 
-ggsave('outs/TwoYear_BothDonors_321-05_pickedClone_clone_number.pdf', 
+ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_clone_number.pdf', 
        plot = picked_pl_FNA_n,
        height = 6, width = 12, useDingbats = F)
 
@@ -422,7 +434,7 @@ FNA_df <-FNA_df %>%
   mutate(flu_specific = ifelse(Tfh_clone_id %in% hits, Tfh_clone_id, 'other'))
 
 picked_pl_hits <- ggplot(data = FNA_df,
-                        aes(x = time, 
+                        aes(x = time_point, 
                             y = freq, 
                             alluvium = Tfh_clone_id)) +
   geom_alluvium(aes(fill = flu_specific, color = blood),
@@ -439,7 +451,7 @@ picked_pl_hits <- ggplot(data = FNA_df,
   scale_fill_manual(values = clonePal) +
   scale_color_manual(values = bloodpal)
 
-ggsave('outs/TwoYear_BothDonors_321-05_pickedClone_flu_specific_clone_freqs.pdf', 
+ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_flu_specific_clone_freqs.pdf', 
        plot = picked_pl_hits,
        height = 6, width = 12, useDingbats = F)
 
@@ -456,7 +468,7 @@ pickedClone_seqs <- Clonedf %>%
 
 # import bulk data
 
-bulk_clones <- read.delim("data/Ali_bulk_allDonor_clones.tsv", 
+bulk_clones <- read.delim("./repdata/bulk/clone_tables/Ali_bulk_allDonor_clones.tsv", 
                           stringsAsFactors = F)
 #split to alpha beta
 bulk_d5_chains <- bulk_clones %>%
@@ -506,7 +518,7 @@ for (i in seq_along(bulk_d5_chains)){
   
   alluv_plots[[i]] <- alluv_pl
   match_dfs[[i]] <- d5_match
-  filename <- paste0('outs/TwoYear_BothDonors_321-05_pickedClone_bulk_', chain,'.pdf')
+  filename <- paste0('./10x/outs/Set2_321-05_pickedClone_bulk_', chain,'.pdf')
   ggsave(filename, 
          plot = alluv_pl,
          height = 4, width = 6, useDingbats = F)
@@ -515,7 +527,7 @@ for (i in seq_along(bulk_d5_chains)){
 # make a combined layout of the 10X and bulk plots =
 pickedClone_alluvials <- (picked_pl_all/ alluv_plots[[2]]) + plot_layout(guides = 'collect')
 
-ggsave('outs/TwoYear_BothDonors_321-05_pickedClone_10x_and_bulk_TCRb.pdf', 
+ggsave('./10x/outs/Set2_321-05_pickedClone_10x_and_bulk_TCRb.pdf', 
        plot = pickedClone_alluvials,
        height = 13.5, width = 8, useDingbats = F)
 
@@ -537,7 +549,7 @@ pc_hm_long <- pheatmap(degs_scale_data_t,
                        show_rownames  = FALSE
 ) %>%
   as.ggplot(.)
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClone_gex_long.pdf', plot = pc_hm_long,
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClone_gex_long.pdf', plot = pc_hm_long,
        height = 13, width = 6, useDingbats = F)
 
 # or averaged gene expression
@@ -584,6 +596,6 @@ pc_hm_avg <- pheatmap(degs_avg_exp_mat,
                       show_colnames  = FALSE, gaps_col = gaps_col) %>%
   as.ggplot(.)
 
-ggsave('outs/TwoYear_Donor_321-05_Tfh_pickedClone_gex_averaged.pdf', 
+ggsave('./10x/outs/Set2_Donor_321-05_Tfh_pickedClone_gex_averaged.pdf', 
        plot = pc_hm_avg,
        height = 8, width = 13, useDingbats = F)

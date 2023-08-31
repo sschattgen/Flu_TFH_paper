@@ -3,12 +3,16 @@ source('Z:/ResearchHome/Groups/thomagrp/home/sschattg/bioinformatics_projects/Al
 setwd(tfh_working_dir)
 
 # import clone_df and Tfh obj ==== 
-Clonedf <- read.delim( clone_df_path , stringsAsFactors = F)
+Clonedf <- read.delim( clone_df_path , stringsAsFactors = F) %>%
+  mutate(Tfh_type2 = ifelse(is.na(Tfh_type) | Tfh_type =='Treg',NA, 'Tfh' )) %>%
+  filter(donor %in% c('321-04','321-05')) %>%
+  mutate(time_point = factor(time_point, level=names(TimePal2)))
+
 
 # calculate the frequency of Tfh cells by time and tissue ====
 
 typeFreqTT <- Clonedf %>% 
-  select(donor, tissue, time, Tfh_type) %>% 
+  select(donor, tissue, time_point, Tfh_type2) %>% 
   group_by_all() %>% 
   tally() %>%
   mutate(freq_tissue_time = n / sum(n)) %>%
@@ -17,9 +21,9 @@ typeFreqTT <- Clonedf %>%
 # group-split-apply to calc the number of unique clones and per cell number ====
 
 splitClones <- Clonedf %>% 
-  filter(tissue =='FNA') %>%
-  select(donor, tissue, time, year, day, Tfh_type, clone_id) %>%
-  group_by(donor, tissue, time, Tfh_type) %>% 
+  #filter(tissue =='FNA') %>%
+  select(donor, tissue, time_point, year, day, Tfh_type2, clone_id) %>%
+  group_by(donor, tissue, time_point, Tfh_type2) %>% 
   group_split()
 
 clonalityCalc <- function( in_list ){
@@ -70,17 +74,17 @@ clones_freq <- clonalityCalc( splitClones )
 
 # bind together and subset Tfh ====
 
-TypeCloneFreq <- full_join( clones_freq , typeFreqTT , by =c('donor', 'tissue','time', 'Tfh_type') )
+TypeCloneFreq <- full_join( clones_freq , typeFreqTT , by =c('donor', 'tissue','time_point', 'Tfh_type2') )
 
 time_breaks <- c(0,5,12,28,60,90,120,180,220,227,234,248,280,310,340)
-tdf <- data.frame(time = names(TimePal2),
+tdf <- data.frame(time_point = names(TimePal2)[c(1:3,5:length(names(TimePal2)))],
                   time_encode = time_breaks)
 
 Tfh_clones_freq <- TypeCloneFreq %>% 
-  filter( !is.na(Tfh_type) & tissue == 'FNA') %>%
+  filter( !is.na(Tfh_type2) & tissue == 'FNA') %>%
   mutate(D50 = 1/D50) %>%
-  mutate(time = factor(time, levels = names(TimePal2))) %>%
-  left_join(., tdf)
+  left_join(., tdf)  %>%
+  mutate(time_point = factor(time_point, levels = names(TimePal2))) 
 
 Tfh_clones_freq_yr_split <- Tfh_clones_freq %>%
   group_by(year) %>%
@@ -89,7 +93,7 @@ Tfh_clones_freq_yr_split <- Tfh_clones_freq %>%
 
 # plots ====
 
-uclones <- ggplot( Tfh_clones_freq , aes(x= time, y= unique_per_cell, color = donor)) +
+uclones <- ggplot( Tfh_clones_freq , aes(x= time_point, y= unique_per_cell, color = donor)) +
   geom_point(size = 4) +
   geom_line(aes(group= donor), size =2) +
   scale_color_manual(values = DonorPal[1:2], breaks = DonorPal[1:2]) +
@@ -114,7 +118,7 @@ uclones_TwoYr <- ggplot( Tfh_clones_freq , aes(x= time_encode, y= unique_clones,
   ylab("Unique clones") +
   labs(title = 'TFH clone number')
 
-cfclones_TwoYr <- ggplot( Tfh_clones_freq , aes(x= time_encode, y= 1/D50, color = donor, group= donor)) +
+cfclones_TwoYr <- ggplot( Tfh_clones_freq , aes(x= time_encode, y= D50, color = donor, group= donor)) +
   geom_point(size = 4) +
   geom_line(size =2) +
   scale_color_manual(values = DonorPal[1:2]) +
@@ -134,7 +138,7 @@ tfreq_TwoYr <- ggplot( Tfh_clones_freq , aes(x= time_encode, y= freq_tissue_time
   scale_color_manual(values = DonorPal[1:2]) +
   theme_minimal() +
   scale_x_continuous( breaks=time_breaks, 
-                      labels=c("0", "5", "12", "28", "60", "90", "120", "180", "0","7","14","28","60","90","120"), 
+                      labels=c("0", "5", "12","28", "60", "90", "120", "180", "0","7","14","28","60","90","120"), 
                       limits=c(-2, 342)) +
   theme(axis.text.y = element_text(size = 18),
         axis.text.x = element_blank(),
@@ -144,7 +148,7 @@ tfreq_TwoYr <- ggplot( Tfh_clones_freq , aes(x= time_encode, y= freq_tissue_time
   labs(title = 'TFH Frequency in LN')
 
 
-cfclones_yr1 <- ggplot( Tfh_clones_freq_yr_split[[1]] , aes(x= day, y= 1/D50, color = donor)) +
+cfclones_yr1 <- ggplot( Tfh_clones_freq_yr_split[[1]] , aes(x= day, y= D50, color = donor)) +
   geom_point(size = 4) +
   geom_line(aes(group= donor), size =2) +
   scale_color_manual(values = DonorPal[1:2]) +
@@ -158,7 +162,7 @@ cfclones_yr1 <- ggplot( Tfh_clones_freq_yr_split[[1]] , aes(x= day, y= 1/D50, co
   ylab("1 / D50 index") +
   labs(title = 'Year 1')
 
-cfclones_yr2 <- ggplot( Tfh_clones_freq_yr_split[[2]] , aes(x= day, y= 1/D50, color = donor)) +
+cfclones_yr2 <- ggplot( Tfh_clones_freq_yr_split[[2]] , aes(x= day, y= D50, color = donor)) +
   geom_point(size = 4) +
   geom_line(aes(group= donor), size =2) +
   scale_color_manual(values = DonorPal[1:2]) +
@@ -229,12 +233,12 @@ freq_plots | cf_plots
 #  theme_minimal()
 
 
-Cf_v_freq <- ggplot( Tfh_clones_freq , aes(x= freq_tissue_time, y= 1/D50)) +
-  geom_point(aes(color = donor, fill = time), size = 4, shape =21, stroke =2) +
+Cf_v_freq <- ggplot( Tfh_clones_freq , aes(x= freq_tissue_time, y= D50)) +
+  geom_point(aes(color = donor, fill = time_point), size = 4, shape =21, stroke =2) +
   scale_fill_manual(values = TimePal2) +
   scale_color_manual(values = DonorPal[1:2]) +
   geom_smooth(method = 'lm', se=FALSE, ) +
-  stat_cor(size = 10, label.x.npc = 0.4, label.y.npc = 0) +
+  stat_cor(size = 10, label.x.npc = 0.05, label.y.npc = 1) +
   theme_minimal() +
   xlab("Tfh frequency") +
   ylab('1 / D50 index') +
@@ -248,13 +252,12 @@ Cf_v_freq <- ggplot( Tfh_clones_freq , aes(x= freq_tissue_time, y= 1/D50)) +
 
 tfh_plots <-  freq_plots | cf_plots | Cf_v_freq
 
-ggsave("./10x/outs/TwoYear_Tfh_clonality_figure.pdf", 
+ggsave("./10x/outs/Set2_Tfh_clonality_figure.pdf", 
        plot = tfh_plots,  
        width = 24 , height = 8,
        useDingbats = F)
 tfh_plots_new <- (tfreq_TwoYr  / cfclones_TwoYr) + plot_layout(guides = 'collect') & theme(legend.position = 'bottom')
-ggsave("./10x/outs/TwoYear_Tfh_clonality_figure_v2.pdf", 
+ggsave("./10x/outs/Set2_Tfh_clonality_figure_v2.pdf", 
        plot = tfh_plots_new,  
        width = 18 , height = 8,
        useDingbats = F)
-
