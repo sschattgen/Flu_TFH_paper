@@ -59,6 +59,9 @@ if(!require(ggplotify, quietly = TRUE)) {
 if(!require(Peptides, quietly = TRUE)) {
   install.packages(Peptides, repos = 'https://cloud.r-project.org/')
 } 
+if(!require(scCustomize, quietly = TRUE)) {
+  install.packages(scCustomize, repos = 'https://cloud.r-project.org/')
+} 
 if(!require(RedeR, quietly = TRUE)) {
   if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")

@@ -1,12 +1,14 @@
 # this script generates table of clonotype data for all cells in the BothDonors_Tcells dataset 
 # match to sc and bulk rep data and associated plots
 
-source('Z:/ResearchHome/ResearchHomeDirs/thomagrp/sschattg/bioinformatics_projects/Ali_Tfh/scripts/tfh_pkgs_paths_vars.R')
+source('Z:/ResearchHome/Groups/thomagrp/home/sschattg/bioinformatics_projects/Ali_Tfh/scripts/tfh_pkgs_paths_vars.R')
 setwd(tfh_working_dir)
 
 # import T cell seurat object, and the scPCR and bulk data ----
 
 Tcells <- readRDS(Set2_integrated_Tcells_path)
+cpal <- cols25(length(levels(Tcells@meta.data$ident)))
+names(cpal) <- levels(Tcells@meta.data$ident)
 
 # paired scPCR and bulk data from sorted Tfh cells
 pairedSC <- read.delim('./repdata/sc/clone_tables/Ali_paired_sc_clones_JCC283.tsv', 
@@ -31,11 +33,13 @@ Clonedf <- Clonedf %>%
 Clonedf <- countClones(Clonedf)
 
 # are any clones shared between the donors?
-donorShared_clones <- Clonedf %>% 
+donorShared_clones <- Clonedf %>%
+  ungroup() %>% 
   select(strict.match.cdr, donor) %>%
   group_by_all()%>% 
   distinct(.keep_all = T) %>%
-  ungroup(donor) %>%
+  ungroup() %>%
+  group_by(strict.match.cdr) %>%
   add_count(strict.match.cdr, name = "num_libraries") %>% 
   select(-donor) %>%
   distinct(.keep_all = T) %>%
@@ -89,21 +93,24 @@ cdr3b_len <- ggplot(dClonesLen, aes(x = factor(ident), y =cdr3b_length, group = 
 countident <- Clonedf %>% 
   group_by(ident, clone_id) %>% 
   distinct(clone_id, .keep_all = T) %>% 
-  select(clone_id, ident, count_cluster)
+  select(clone_id, ident, clone_size_group)
 
-ctClusterUMAP <- ggplot(Clonedf , aes(UMAP_1, UMAP_2, color = log10(1 + count_total) )) + 
-  geom_point(size = 0.5 ) +  scale_color_viridis(option = "C") + 
-  theme_minimal() + 
-  labs(title = "Clone size total dataset")
+ctClusterUMAP <- ggplot(Clonedf , aes(UMAP_1, UMAP_2, color = log10(1 + total_clone_size) )) + 
+  geom_point_rast(size = 0.5 ) + 
+  theme_bw() +
+  scale_color_viridis(option = "C") + 
+  labs(title = "Clone size total dataset", color = 'log(clone size +1)')
 
-ctClusterJitter <- ggplot(countident, aes(ident, log10(1 +count_cluster))) + geom_jitter(aes(color = log10(1 +count_cluster))) + 
+ctClusterJitter <- ggplot(countident, aes(factor(ident), log10(1 +clone_size_group))) + 
+  geom_jitter_rast(aes(color = log10(1 +clone_size_group))) + 
+  theme_bw() +
   scale_color_viridis() + 
-  theme_minimal() + 
-  labs(title = "Clone size within cluster")  + 
+  labs(title = "Clone size within cluster", color = 'log(clone size +1)')  + 
   theme(legend.position = "none", axis.text.x = element_text(angle = 90)) 
 
-csize_plot <- (ctClusterUMAP / ctClusterJitter) + plot_layout(heights = c(2,1))
+csize_plot <- (ctClusterUMAP | ctClusterJitter) 
 ggsave('./10x/outs/Set2_Tcell_cloneSizes.png', plot = csize_plot, height = 10, width = 7)
+ggsave('./10x/outs/Set2_Tcell_cloneSizes.pdf', plot = csize_plot, height = 5, width = 11)
 
 
 # plot the top100clones and their cluster freq
@@ -124,7 +131,8 @@ TopSplitCluster <- ggplot(TopIdent , aes(clone_id, freq, fill = ident)) +
   labs(title = "Cluster distribution of Top100 clones") + 
   geom_text(data=TopClones[[1]], aes(clone_id, y =1.1, label= n), inherit.aes = F, angle=90,hjust=1, vjust= 0.5) +
   theme(axis.text.x = element_blank(),
-        legend.position = "bottom" ) 
+        legend.position = "bottom" ) +
+  scale_fill_manual(values = cpal)
 
 TopSplitCluster
 ggsave('./10x/outs/Set2_TopClones_clusters.png', height = 5, width = 20)
@@ -154,25 +162,28 @@ cols2 <- c("grey90", DonorPal[2])
 names(cols2) <- c("no", "yes")
 
 d4_match_scPCR_UMAP <- ggplot(Clonedf) + 
-  geom_point(data = subset(Clonedf, donor_321_04_paired_scPCR_match == 'no'),
+  geom_point_rast(data = subset(Clonedf, donor_321_04_paired_scPCR_match == 'no'),
              aes(UMAP_1, UMAP_2, colour = donor_321_04_paired_scPCR_match)) +
-  geom_point(data = subset(Clonedf, donor_321_04_paired_scPCR_match != 'no'),
+  geom_point_rast(data = subset(Clonedf, donor_321_04_paired_scPCR_match != 'no'),
              aes(UMAP_1, UMAP_2, colour = donor_321_04_paired_scPCR_match)) +
   scale_colour_manual(values = cols , breaks = cols ) +
-  theme_minimal() +
-  labs(title = "Clone match to paired scPCR from Donor 321-04")
+  theme_bw() +
+  labs(title = "Clone match to paired scPCR from Donor 321-04")+
+  theme(panel.grid = element_blank())
 
 d5_match_scPCR_UMAP <- ggplot(Clonedf) + 
-  geom_point(data = subset(Clonedf, donor_321_05_paired_scPCR_match == 'no'),
+  geom_point_rast(data = subset(Clonedf, donor_321_05_paired_scPCR_match == 'no'),
              aes(UMAP_1, UMAP_2, colour = donor_321_05_paired_scPCR_match)) +
-  geom_point(data = subset(Clonedf, donor_321_05_paired_scPCR_match != 'no'),
+  geom_point_rast(data = subset(Clonedf, donor_321_05_paired_scPCR_match != 'no'),
              aes(UMAP_1, UMAP_2, colour = donor_321_05_paired_scPCR_match)) +
   scale_colour_manual(values = cols2 , breaks = cols2 ) +
-  theme_minimal() +
-  labs(title = "Clone match to paired scPCR from Donor 321-05")
+  theme_bw() +
+  labs(title = "Clone match to paired scPCR from Donor 321-05") +
+  theme(panel.grid = element_blank())
 
-d4_match_scPCR_UMAP | d5_match_scPCR_UMAP
-ggsave('./10x/outs/Set2_scPCR_pairedMatch.png', height = 6.5, width = 12)
+scmatch <- d4_match_scPCR_UMAP / d5_match_scPCR_UMAP
+ggsave('./10x/outs/Set2_scPCR_pairedMatch.png',plot = scmatch,  height = 13, width = 6.5)
+ggsave('./10x/outs/Set2_scPCR_pairedMatch.pdf', plot = scmatch, height = 13, width = 6.5)
 
 # bulk TCRs -----
 #match the bulk back to seurat object
@@ -187,74 +198,81 @@ Clonedf$matched_321_05_beta_bulk <- ifelse(Clonedf$cdr3b %in% d5_bulk$cdr3aa, "y
 
 
 d4_match_alpha_UMAP <- ggplot(Clonedf) + 
-  geom_point(data = subset(Clonedf, matched_321_04_alpha_bulk  == 'no'),
+  geom_point_rast(data = subset(Clonedf, matched_321_04_alpha_bulk  == 'no'),
              aes(UMAP_1, UMAP_2, colour = matched_321_04_alpha_bulk )) +
-  geom_point(data = subset(Clonedf, matched_321_04_alpha_bulk  != 'no'),
+  geom_point_rast(data = subset(Clonedf, matched_321_04_alpha_bulk  != 'no'),
              aes(UMAP_1, UMAP_2, colour = matched_321_04_alpha_bulk )) +
   scale_colour_manual(values = cols , breaks = cols ) +
-  theme_minimal() +
-  labs(title = "CDR3a matched bulk from Donor 321-04")
+  theme_bw() +
+  labs(title = "CDR3a matched bulk from Donor 321-04")+
+  theme(panel.grid = element_blank())
 
 d4_match_beta_UMAP <- ggplot(Clonedf) + 
-  geom_point(data = subset(Clonedf, matched_321_04_beta_bulk  == 'no'),
+  geom_point_rast(data = subset(Clonedf, matched_321_04_beta_bulk  == 'no'),
              aes(UMAP_1, UMAP_2, colour = matched_321_04_beta_bulk )) +
-  geom_point(data = subset(Clonedf, matched_321_04_beta_bulk  != 'no'),
+  geom_point_rast(data = subset(Clonedf, matched_321_04_beta_bulk  != 'no'),
              aes(UMAP_1, UMAP_2, colour = matched_321_04_beta_bulk )) +
   scale_colour_manual(values = cols , breaks = cols ) +
-  theme_minimal() +
-  labs(title = "CDR3b matched bulk from Donor 321-04")
+  theme_bw() +
+  labs(title = "CDR3b matched bulk from Donor 321-04")+
+  theme(panel.grid = element_blank())
 
 d5_match_alpha_UMAP <- ggplot(Clonedf) + 
-  geom_point(data = subset(Clonedf, matched_321_05_alpha_bulk  == 'no'),
+  geom_point_rast(data = subset(Clonedf, matched_321_05_alpha_bulk  == 'no'),
              aes(UMAP_1, UMAP_2, colour = matched_321_05_alpha_bulk )) +
-  geom_point(data = subset(Clonedf, matched_321_05_alpha_bulk  != 'no'),
+  geom_point_rast(data = subset(Clonedf, matched_321_05_alpha_bulk  != 'no'),
              aes(UMAP_1, UMAP_2, colour = matched_321_05_alpha_bulk )) +
   scale_colour_manual(values = cols2 , breaks = cols2 ) +
-  theme_minimal() +
-  labs(title = "CDR3a matched bulk from Donor 321-05")
+  theme_bw() +
+  labs(title = "CDR3a matched bulk from Donor 321-05")+
+  theme(panel.grid = element_blank())
 
 d5_match_beta_UMAP <- ggplot(Clonedf) + 
-  geom_point(data = subset(Clonedf, matched_321_05_beta_bulk  == 'no'),
+  geom_point_rast(data = subset(Clonedf, matched_321_05_beta_bulk  == 'no'),
              aes(UMAP_1, UMAP_2, colour = matched_321_05_beta_bulk )) +
-  geom_point(data = subset(Clonedf, matched_321_05_beta_bulk  != 'no'),
+  geom_point_rast(data = subset(Clonedf, matched_321_05_beta_bulk  != 'no'),
              aes(UMAP_1, UMAP_2, colour = matched_321_05_beta_bulk )) +
   scale_colour_manual(values = cols2 , breaks = cols2 ) +
-  theme_minimal() +
-  labs(title = "CDR3b matched bulk from Donor 321-05")
+  theme_bw() +
+  labs(title = "CDR3b matched bulk from Donor 321-05")+
+  theme(panel.grid = element_blank())
 
-d4_match_alpha_col <- ggplot( Clonedf ,aes(x = ident, y = freq_cluster, fill = matched_321_04_alpha_bulk ) ) + 
+d4_match_alpha_col <- ggplot( Clonedf ,aes(x = ident, y = freq, fill = matched_321_04_alpha_bulk ) ) + 
   geom_col(position = "fill") + 
   scale_fill_manual(values = cols , breaks = cols ) + 
-  theme_minimal() +
+  theme_bw() +
   labs(title = "CDR3a matched bulk from Donor 321-04") + 
-  theme(axis.text.x = element_text(angle = 90)) 
+  theme(axis.text.x = element_text(angle = 90), panel.grid = element_blank()) 
 
-d4_match_beta_col <- ggplot( Clonedf ,aes(x = ident, y = freq_cluster, fill = matched_321_04_beta_bulk ) ) + 
+d4_match_beta_col <- ggplot( Clonedf ,aes(x = ident, y = freq, fill = matched_321_04_beta_bulk ) ) + 
   geom_col(position = "fill") + 
   scale_fill_manual(values = cols , breaks = cols ) + 
-  theme_minimal() +
+  theme_bw() +
   labs(title = "CDR3b matched bulk from Donor 321-04") + 
-  theme(axis.text.x = element_text(angle = 90)) 
+  theme(axis.text.x = element_text(angle = 90), panel.grid = element_blank()) 
 
-d5_match_alpha_col <- ggplot( Clonedf ,aes(x = ident, y = freq_cluster, fill = matched_321_05_alpha_bulk ) ) + 
+d5_match_alpha_col <- ggplot( Clonedf ,aes(x = ident, y = freq, fill = matched_321_05_alpha_bulk ) ) + 
   geom_col(position = "fill") + 
   scale_fill_manual(values = cols2 , breaks = cols2 ) + 
-  theme_minimal() +
+  theme_bw() +
   labs(title = "CDR3a matched bulk from Donor 321-05") + 
-  theme(axis.text.x = element_text(angle = 90)) 
+  theme(axis.text.x = element_text(angle = 90), panel.grid = element_blank()) 
 
-d5_match_beta_col <- ggplot( Clonedf ,aes(x = ident, y = freq_cluster, fill = matched_321_05_beta_bulk ) ) + 
+d5_match_beta_col <- ggplot( Clonedf ,aes(x = ident, y = freq, fill = matched_321_05_beta_bulk ) ) + 
   geom_col(position = "fill") + 
   scale_fill_manual(values = cols2 , breaks = cols2 ) + 
-  theme_minimal() +
+  theme_bw() +
   labs(title = "CDR3b matched bulk from Donor 321-05") + 
-  theme(axis.text.x = element_text(angle = 90)) 
+  theme(axis.text.x = element_text(angle = 90), panel.grid = element_blank()) 
 
 (d4_match_alpha_UMAP | d4_match_beta_UMAP | d5_match_alpha_UMAP | d5_match_beta_UMAP) / 
   (d4_match_alpha_col | d4_match_beta_col | d5_match_alpha_col | d5_match_beta_col)
 
 ggsave('./10x/outs/Set2_bulk_matched_chains.png', height = 10, width = 22)
+ggsave('./10x/outs/Set2_bulk_matched_chains.pdf', height = 10, width = 22)
 
+(d4_match_alpha_col | d4_match_beta_col | d5_match_alpha_col | d5_match_beta_col) 
+ggsave('./10x/outs/Set2_bulk_matched_chains_justhistos.pdf', height = 5, width = 22)
 
 # add the picked clones from the original analysis ====
 
@@ -274,11 +292,11 @@ Clonedf <- left_join(Clonedf, pickedClones_yr1_short)
 
 
 # add clone_size to Tcells
-counts <- Clonedf$count_total
+counts <- Clonedf$total_clone_size
 names(counts) <- Clonedf$barcode
 Tcells <- AddMetaData( Tcells, metadata = counts, col.name = 'clone_size')
 
-counts_log <- log(Clonedf$count_total + 1)
+counts_log <- log(Clonedf$total_clone_size + 1)
 names(counts_log) <- Clonedf$barcode
 Tcells <- AddMetaData( Tcells, metadata = counts_log, col.name = 'clone_size_log')
 

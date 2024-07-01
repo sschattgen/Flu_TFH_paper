@@ -7,8 +7,15 @@ session_mem <- 1000 * 1024^2
 options(future.globals.maxSize= session_mem)
 rename <- dplyr::rename
 # import T cells Seurat object and df ----
-Tfh_obj <- readRDS(Tfh_lineages_path)
-Clonedf <- read.delim(clone_df_path, stringsAsFactors = F)
+Tfh_obj <- readRDS(Set2_integrated_Tfh_path)
+
+CD4_Tcells <- readRDS(Set2_integrated_CD4_path)
+Clonedf <- read.delim( clone_df_path , stringsAsFactors = F) 
+
+
+CD4_Clonedf <- Clonedf %>% 
+  filter(barcode %in% colnames(CD4_Tcells) & tissue == 'FNA')
+
 
 Bcell_freqs <- read.csv('./10x/outs/TwoYear_LN_Bcell_freq_time.csv') %>%
   mutate(year = ifelse(grepl('y1',time_point),'1','2'),
@@ -23,6 +30,14 @@ tfh_gene_set_c <- c('CXCR5', 'PDCD1','CCR7','SELL',
                     'TOX2','GNG4', 'CXCL13', 'IL21',
                     'FOXB1','DUSP4', 'DDIT4', 'IL10')
 
+
+
+keepTFH <- FetchData(Tfh_obj, c('Tfh_type')) %>%
+  filter(Tfh_type %notin% c('high ISG', 'cycling','naive')) %>%
+  rownames()
+
+Tfh_obj2 <- subset(Tfh_obj, cells = keepTFH)
+
 # split object by donor ====
 Donors <- c('321-04','321-05')
 donor_objs <-list()
@@ -30,7 +45,7 @@ for (i in seq(Donors)){
   
   Tfh_d <- subset(Tfh_obj, subset = donor == Donors[i] & tissue == 'FNA')
   DefaultAssay(Tfh_d) <- 'RNA'
-  Tfh_d<- SeuratReprocess(Tfh_d)
+  #Tfh_d<- SeuratReprocess(Tfh_d)
   donor_objs <-list.append( donor_objs , Tfh_d  )
   names(donor_objs)[i] <- Donors[i]
   
@@ -178,7 +193,11 @@ ggsave('./10x/outs/Set2_Tfh_lineages_donor5_time_vln.pdf', d5_vln, width = 939/7
 
 # chi-squared test and plotting for phenotype enrichment ====
 
-Tfh_ident_df <- FetchData( Tfh_obj, vars = c('donor', 'time_point', 'year','day', 'tissue', 'Tfh_type', 'clone_id')) %>%
+Tfh_ident_df <- FetchData( Tfh_obj2, vars = c('donor', 'time', 'year','day', 'tissue', 'Tfh_type', 'clone_id')) %>%
+  filter(donor %in% c('321-04','321-05')) %>%
+  mutate(day = factor(day, levels = names(TimePal)))
+
+Tfh_ident_df <- CD4_Clonedf %>%
   filter(donor %in% c('321-04','321-05')) %>%
   mutate(day = factor(day, levels = names(TimePal)))
 
@@ -189,21 +208,34 @@ Tfh_ident_donors <- Tfh_ident_df %>%
 tfh_freq_time <- list()
 for ( i in seq_along(Tfh_ident_donors)){
   
-  this_d <- unique(Tfh_ident_donors[[i]]$donor)
+  this_d <- unique(Tfh_ident_donors[[i]]$donor) %>% as.character()
+  
+  
   df <- Tfh_ident_donors[[i]]  %>%
-    select(-clone_id) %>%
-    filter(tissue =='FNA') %>%
-    select(time_point, Tfh_type) %>%
-    group_by_all() %>%
-    tally() %>% 
-    pivot_wider(values_from = 'n', names_from = 'Tfh_type') %>%
-    mutate_if(is.integer, ~nafill(.x, fill = 0)) %>%
+    select( time_point, Tfh_type,year, day, donor) %>%
+    group_by(time_point, Tfh_type) %>%
+    add_tally(name = 'N_time_type') %>%
+    group_by(time_point) %>%
+    add_tally(name = 'N_time') %>%
+    distinct_all() %>%
+    mutate(freq = N_time_type/ N_time)
+  
+  
+  
+  dfx  <- df %>%
+    filter(!is.na(Tfh_type) & Tfh_type %notin% c('high ISG','cycling', 'naive'))
+  
+  df2 <- dfx %>%
+    select(-freq, -N_time,-year,-day,-donor)  %>%
+    pivot_wider(values_from = 'N_time_type', names_from = 'Tfh_type',values_fill = 0) %>%
     ungroup() %>%
     as.data.frame()
-  rownames(df) <- df$time_point
-  df <- df %>% select(-time_point)
+    
+    
+  rownames(df2) <- df2$time_point
+  df2 <- df2 %>% select(-time_point)
   
-  chisq <- chisq.test(df)
+  chisq <- chisq.test(df2)
   
   label <-paste0("chisq(df = ", 
                  chisq$parameter,
@@ -214,32 +246,35 @@ for ( i in seq_along(Tfh_ident_donors)){
                  ", p ", 
                  format.pval(chisq$p.value)
   )
-  
-  dt <- Tfh_ident_donors[[i]] %>%
-    select(-clone_id) %>%
-    filter(tissue =='FNA') %>%
-    select(time_point, Tfh_type) %>%
-    table() 
-  dt <- dt[which(rowSums(dt) != 0 ), ]
-  
-  
-  Tfh_freq <- Tfh_ident_donors[[i]]%>%
-    select(-clone_id) %>%
-    filter(tissue =='FNA') %>%
-    group_by(time_point, Tfh_type) %>%
-    add_count() %>%
-    distinct_all() %>%
-    ungroup(Tfh_type) %>%
-    add_count(wt = n, name = 'N') %>%
-    mutate(freq = n/N) %>%
-    select(-n,-N) %>%
-    rename(cell_type = Tfh_type)
+  # 
+  # dt <- df %>%
+  #   select(-clone_id) %>%
+  #   filter(tissue =='FNA') %>%
+  #   select(time, Tfh_type) %>%
+  #   mutate(Tfh_type = as.character(Tfh_type)) %>%
+  #   table() 
+  # dt <- dt[which(rowSums(dt) != 0 ), ]
+  # 
+  # 
+  # Tfh_freq <- Tfh_ident_donors[[i]]%>%
+  #   select(-clone_id) %>%
+  #   filter(tissue =='FNA') %>%
+  #   group_by(time, Tfh_type) %>%
+  #   add_count() %>%
+  #   distinct_all() %>%
+  #   ungroup(Tfh_type) %>%
+  #   add_count(wt = n, name = 'N') %>%
+  #   mutate(freq = n/N) %>%
+  #   select(-n,-N) %>%
+  #   rename(cell_type = Tfh_type)
   
   
   time_breaks <- c(0,5,12,28,60,90,120,180,220,227,234,248,280,310,340)
-  tdf <- data.frame(time_point = factor(names(TimePal2)[c(1:3,5:length(names(TimePal2)))], levels = names(TimePal2)[c(1:3,5:length(names(TimePal2)))]),
+  tdf <- data.frame(time = factor(names(TimePal2)[c(1:3,5:length(names(TimePal2)))], levels = names(TimePal2)[c(1:3,5:length(names(TimePal2)))]),
                     time_encode = as.integer(time_breaks))
-  Tfh_freq <- bind_rows(Tfh_freq, filter(Bcell_freqs, donor == this_d)) #add B cells
+  d_Bcells <- filter(Bcell_freqs, donor == this_d) %>% mutate(year = as.integer(year)) %>%select(-tissue)
+  tfh_freq_x <- select(dfx, -N_time,-N_time_type) %>% rename(cell_type = Tfh_type)
+  Tfh_freq <- bind_rows(tfh_freq_x , d_Bcells) %>% rename(time = time_point) #add B cells
   Tfh_freq <- left_join(Tfh_freq, tdf) 
   
 
@@ -272,27 +307,29 @@ for ( i in seq_along(Tfh_ident_donors)){
 }
 
 TfhPal_ <- append(TfhPal, 'grey70')
-names(TfhPal_)[5] <- 'GC B cell'
+names(TfhPal_)[length(TfhPal_)] <- 'GC B cell'
 
 d4_ <- ggplot( tfh_freq_time[[1]]$table , aes(x= time_encode, y= freq, color = cell_type, group= cell_type)) +
   geom_point(size = 4) +
   geom_line(size =2) +
   scale_color_manual(values = TfhPal_) +
+  scale_y_log10() +
   theme_minimal() +
   scale_x_continuous( breaks=time_breaks[which(time_breaks %in% tfh_freq_time[[1]]$table$time_encode)], 
-                      labels=c("0", "5", "12", "120", "0","14","90","120"), 
+                      labels=c("0", "5", "12", "120", "0","14","60","90"), 
                       limits=c(-2, 342)) +
   theme(axis.text = element_text(size = 18),
         axis.title = element_text(size = 22),
         axis.title.x = element_blank()) +
   xlab("Days post vaccination") +
-  ylab("Frequency of Tfh cells by phenotype") +
+  ylab("Freq CD4+ T cells or B cells") +
   labs(title = names(tfh_freq_time)[1], subtitle = tfh_freq_time[[1]]$label)
 
 d5_ <- ggplot( tfh_freq_time[[2]]$table , aes(x= time_encode, y= freq, color = cell_type, group= cell_type)) +
   geom_point(size = 4) +
   geom_line(size =2) +
   scale_color_manual(values = TfhPal_) +
+  scale_y_log10() +
   theme_minimal() +
   scale_x_continuous( breaks=time_breaks[which(time_breaks %in% tfh_freq_time[[2]]$table$time_encode)], 
                       labels=c("0", "5", "12","28","60","90","180", "0","7","28","60","120"), 
@@ -301,7 +338,7 @@ d5_ <- ggplot( tfh_freq_time[[2]]$table , aes(x= time_encode, y= freq, color = c
         axis.title = element_text(size = 22),
         axis.title.x = element_blank()) +
   xlab("Days post vaccination") +
-  ylab("Frequency of Tfh cells by phenotype") +
+  ylab("Freq CD4+ T cells or B cells") +
   labs(title = names(tfh_freq_time)[2], subtitle = tfh_freq_time[[2]]$label)
 
 ggsave('./10x/outs/Set2_Tfh_lineages_Tfh_type_freq_donor4_v2.pdf', d4_, width = 18, height = 5, useDingbats = F)

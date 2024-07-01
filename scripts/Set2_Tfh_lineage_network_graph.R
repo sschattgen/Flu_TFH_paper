@@ -34,7 +34,12 @@ draw_lineage_network <- function(lineage_table,
   
   ### if by.time = TRUE
   if(by.time) {
-    
+    node_w_df <- lineage_table %>%
+      group_by(time_point, cell_type) %>%
+      tally() %>%
+      mutate(name = paste(cell_type, gsub('_','-',time_point ), sep = '_'))
+    node_weights <- node_w_df[['n']]
+    names(node_weights) <- node_w_df[['name']]
     ### set node names
     node_names <- c(paste("PBMC", time_points, sep = "_"),
                     paste("FNA", time_points, sep = "_"))
@@ -102,6 +107,9 @@ draw_lineage_network <- function(lineage_table,
     V(g)$nodeSize <- sapply(V(g)$name, function(x) {
       return(max(adj_mat[,x]))
     })
+    V(g)$nodeSize <- sapply(V(g)$name, function(x) {
+      return(node_weights[[x]])
+    })
     V(g)$nodeSize <- (V(g)$nodeSize / max(V(g)$nodeSize, na.rm = TRUE)) * 100
     V(g)$color <- sapply(V(g)$name, function(x) {
       if(grepl("PBMC", x, fixed = TRUE)) {
@@ -148,10 +156,89 @@ draw_lineage_network <- function(lineage_table,
   } 
   
 }
-
+draw_lineage_network2 <- function(lineage_table,
+                                 by.time=TRUE) {
+  
+  ### load library
+  if(!require(igraph, quietly = TRUE)) {
+    install.packages("igraph")
+    require(igraph, quietly = TRUE)
+  }
+  if(!require(RedeR, quietly = TRUE)) {
+    if (!requireNamespace("BiocManager", quietly = TRUE))
+      install.packages("BiocManager")
+    BiocManager::install("RedeR")
+    require(RedeR, quietly = TRUE)
+  }
+  
+  ### get time points
+  time_points <- colnames(lineage_table)[4:(ncol(lineage_table))]
+  
+  ### if by.time = TRUE
+  if(by.time) {
+    
+    ### set node names
+    node_names <- c(paste("PBMC", time_points, sep = "_"),
+                    paste("FNA", time_points, sep = "_"))
+    
+    ### make adjacency matrix for network
+    ### rows: outbound
+    ### columns: inbound
+    adj_mat <- matrix(0, length(node_names), length(node_names))
+    rownames(adj_mat) <- node_names
+    colnames(adj_mat) <- node_names
+    
+    for(r in rownames(adj_mat)) {
+      for(c in colnames(adj_mat)) {
+        ### outbound
+        temp <- strsplit(r, split = "_", fixed = TRUE)[[1]]
+        outbound_tissue <- temp[1]
+        outbound_day <- temp[2]
+        
+        ### inbound
+        temp <- strsplit(c, split = "_", fixed = TRUE)[[1]]
+        inbound_tissue <- temp[1]
+        inbound_day <- temp[2]
+        
+        ### tissue indicies
+        ridx <- which(lineage_table$cell_type == outbound_tissue)
+        cidx <- which(lineage_table$cell_type == inbound_tissue)
+        
+        ### fill out the table
+        for(i in ridx) {
+          for(j in cidx) {
+            if(lineage_table$clone_id[i] == lineage_table$clone_id[j]) {
+              if(lineage_table[i,outbound_day] > 0 && lineage_table[j,inbound_day] > 0) {
+                adj_mat[r,c] <- adj_mat[r,c] + pull(lineage_table[j,inbound_day])
+              }
+              break;
+            }
+          }
+        }
+        
+        ### print progress
+        writeLines(paste(r, c))
+      }
+    }
+    
+    ### diagonal <- 0
+    diag(adj_mat) <- 0
+    
+    ### remove nodes that do not have any connections (edges)
+    remove_idx <- NULL
+    for(i in 1:nrow(adj_mat)) {
+      if((sum(adj_mat[i,]) == 0) && (sum(adj_mat[,i]) == 0)) {
+        remove_idx <- c(remove_idx, i)
+      }
+    }
+    adj_mat <- adj_mat[-remove_idx, -remove_idx]
+  }
+  return(adj_mat)
+}
 #make lineage input ====
 Clonedf <- read.delim(clone_df_path, stringsAsFactors = F) %>%
-  mutate(Tfh_type2 = ifelse(Tfh_type == 'Treg' | is.na(Tfh_type), NA, 'Tfh')) %>%
+  mutate(Tfh_type2 = ifelse(Tfh_type %notin% c("GC","pre/memory","IL10 TFH", "high ISG","cycling") ,NA, 'Tfh' )) %>%
+  mutate(time_point = factor(time_point, level=names(TimePal2))) %>%
   filter(!is.na(day))
 
 tfh_freq_allivium_df <- Clonedf %>%
@@ -175,3 +262,9 @@ draw_lineage_network(lineage_dfs[[1]])
 draw_lineage_network(lineage_dfs[[2]])
 draw_lineage_network(lineage_dfs[[3]])
 draw_lineage_network(lineage_dfs[[4]])
+
+
+
+
+#mat <- draw_lineage_network2(lineage_dfs[[1]])
+#write_tsv(as.data.frame(mat), '~/d4_adj_matrix.adj')

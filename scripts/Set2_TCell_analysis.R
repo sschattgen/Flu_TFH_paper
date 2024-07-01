@@ -1,14 +1,14 @@
 
 source('Z:/ResearchHome/Groups/thomagrp/home/sschattg/bioinformatics_projects/Ali_Tfh/scripts/tfh_pkgs_paths_vars.R')
 setwd(tfh_working_dir)
-
+library(scCustomize)
 # imports ====
 
 Tcells <- readRDS(Set2_integrated_Tcells_path)
 TMarkers <- read.csv( './10x/outs/integrated_markers.csv' , stringsAsFactors = F)
 Clonedf <- read.delim(clone_df_path, stringsAsFactors = F)
 Tcells@meta.data$time_point <- factor(Tcells@meta.data$time_point, levels = names(TimePal2)) 
-
+top_DEGs <- Extract_Top_Markers(TMarkers, num_genes = 5) %>% unique()
 
 # DotPlots of clusters ====
 
@@ -21,13 +21,25 @@ cytokines <- c("IFNG","TNF","IL2","IL21","IL10","AREG","IL21R","IL23R","IL12RB2"
 
 genesA <- c(basic, TF, cytokines, Act, Mem)
 
-DotPlot(Tcells, features =  genesA , dot.scale = 10) + 
-  scale_y_discrete(limits = levels(Tcells@active.ident)) +
-  coord_flip() + scale_color_viridis() + 
-  theme_minimal(base_size = 12) + 
-  theme(axis.text.x = element_text(angle = 90))
+# DotPlot(Tcells, features =  genesA , dot.scale = 10) + 
+#   scale_y_discrete(limits = levels(Tcells@active.ident)) +
+#   coord_flip() + scale_color_viridis() + 
+#   theme_minimal(base_size = 12) + 
+#   theme(axis.text.x = element_text(angle = 90))
+dp <- Clustered_DotPlot(Tcells, top_DEGs)
 
-ggsave('./10x/outs/Set2_dotplot_markers.png', width = 10, height = 13)
+pdf(file = "./10x/outs/Set2_dotplot_markers.pdf",   # The directory you want to save the file in
+    width = 10, # The width of the plot in inches
+    height = 13)
+dp[[2]]
+dev.off()
+png(file = "./10x/outs/Set2_dotplot_markers.png",   # The directory you want to save the file in
+    width = 10,
+    height = 13,
+    units = 'in',
+    res = 300)
+dp[[2]]
+dev.off()
 
 # umap by T cell phenoytpe ====
 
@@ -144,8 +156,10 @@ year_grp_plt <- ggplot(YearGrp, aes(ident, freq, fill = year)) +
 dist_big <- ( TissueUMAP| DonorUMAP | YearUMAP |  TimeUMAP2 ) / ( tissue_grp_plt | donor_grp_plt | year_grp_plt | day_grp_plt )  
 ggsave('./10x/outs/Set2_Tcell_factor_cluster_distributions_w_UMAPs.png', plot= dist_big, height = 12, width = 16)
 
-dist <- ( tissue_grp_plt | donor_grp_plt | year_grp_plt | day_grp_plt) 
-ggsave('./10x/outs/Set2_Tcell_factor_cluster_distributions.png', plot= dist, height = 5, width = 16)
+dist <- ( tissue_grp_plt | donor_grp_plt) / ( year_grp_plt | day_grp_plt) 
+ggsave('./10x/outs/Set2_Tcell_factor_cluster_distributions.png', plot= dist, height = 10, width = 8)
+dist2 <- ( tissue_grp_plt / donor_grp_plt / year_grp_plt / day_grp_plt) 
+ggsave('./10x/outs/Set2_Tcell_factor_cluster_distributions.pdf', plot= dist2, height = 16, width = 8)
 
 # Where are the clonal expansions ====
 
@@ -180,11 +194,18 @@ ggsave('./10x/outs/Set2_Tcell_umaps.png', plot = uplots, height = 12, width = 21
 # Pretty feature plots ====
 
 Feats <- c('CD8B', 'CD4', 'CCR7', 'SELL', "KLRG1", 'KLRB1', 
-           "FOXP3", 'TOX2','CXCR5', "PDCD1", 'ICOS', 'IL21')
+           "FOXP3", 'ICOS','TOX2','CXCR5', "PDCD1", 'IL21')
 
-FPs <- ViridisFeatures( Tcells, feature_args = Feats, size = 3 , option = 'D')
-FPs_panel <- wrap_plots( FPs, nrow =2)
+FPs_panel <- FeaturePlot_scCustom(Tcells, Feats, num_columns = 6) & 
+  NoLegend() & 
+  xlab('UMAP 1') &
+  xlab('UMAP 2') &
+  theme(plot.title = element_text(face = 'italic', hjust = 0.5, size = 7) , 
+        axis.text = element_text(size = 7), 
+        axis.title = element_text(size = 7)) 
+
 ggsave('./10x/outs/Set2_Tcell_feature_plots.png', plot = FPs_panel, height = 5, width = 12)
+ggsave('./10x/outs/Set2_Tcell_feature_plots.pdf', plot = FPs_panel, height = 5, width = 12)
 
 # one page plot ====
 adj <- theme(axis.text = element_text(size = 10) , axis.title = element_text(size = 12))

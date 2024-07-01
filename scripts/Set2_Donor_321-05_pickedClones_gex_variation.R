@@ -18,12 +18,13 @@ ccells <- Tfh_obj@meta.data %>%
 
 pc_obj <- subset(Tfh_obj, cells = ccells) 
 
-pc_obj@meta.data %>% filter(Tfh_clone_id =='Tfh_321-05_clone_3') %>% group_by(tissue) %>% tally()
+pc_obj@meta.data %>%  group_by( Tfh_clone_id, tissue) %>% tally()
+
 DefaultAssay(pc_obj) <- 'RNA'
 pc_obj <- SeuratReprocess(pc_obj)
 pc_obj@meta.data$ident <- pc_obj@active.ident
 
-pcid <- names(clonePal)[c(1,3,11,12)]
+pcid <- names(clonePal)[c(1,3,6,11,12)]
 pc_obj@meta.data$flu_specific <- ifelse(pc_obj@meta.data$Tfh_clone_id %in% pcid, 'yes','unknown')
 
 pc_markers <- FindAllMarkers(pc_obj)
@@ -183,10 +184,10 @@ for (i in seq_along(gaps_col_df)){
 
 # making two versions
 # one with handpicked genes
-picked_tfh_gene_set <-  c('CXCR5', 'PDCD1','CCR7','SELL',
-                   'VIM', 'TMSB10', 'EMP3','TCF7',
-                   'TOX2','GNG4', 'CXCL13', 'IL21',
-                   'FOXB1','DUSP4', 'DDIT4', 'IL10' ,'MAP3K8')
+picked_tfh_gene_set <-  c('CXCR5', 'PDCD1','IRF1','LAG3',
+                   'VIM', 'TMSB10', 'EMP3','KLF2',
+                   'TOX2','GNG4', 'CXCL13', 'IL21','DUSP4',
+                   'FOXB1','DUSP4', 'DDIT4', 'IL10' ,'MAP3K8','NR4A2','ID2','ID3','JUN','FOS','NFKBIA')
 
 # pull the scaled expression for those genes
 scale_data <- pc_obj@assays$RNA@scale.data
@@ -238,11 +239,8 @@ lineages <- sample_col %>%
   group_by(`Clone ID`) %>%
   group_split()
 
-picked_tfh_gene_set2 <-  c('CXCR5', 'PDCD1', 'VIM', 'TMSB10', 
-                           'EMP3','TCF7', 'TOX2','GNG4', 
-                           'CXCL13', 'IL21','DUSP4', 'DDIT4', 
-                           'IL10' ,'MAP3K8')
-
+picked_tfh_gene_set2 <-  c("PDCD1","IRF1", "DUSP4", "VIM","TMSB10", "KLF2","TOX2","CXCL13","IL21","IL10")
+#picked_tfh_gene_set2 <- picked_tfh_gene_set
 breaksList <- seq(-4, 4, by = 0.5)
 
 picked_lineage_hm <- list()
@@ -327,6 +325,8 @@ for ( i in seq_along(day_split)){
 
 merged_picked_clones <- do.call( rbind, day_split_freq) %>% 
   filter( !is.na(Tfh_clone_id)) %>%
+  mutate(Tfh_clone_id = gsub('Tfh_321-05_','',Tfh_clone_id)) %>% 
+  mutate(Tfh_clone_id = gsub('_',' ',Tfh_clone_id)) %>%
   group_by(tissue) %>%
   group_split()
 FNA_df <- merged_picked_clones[[1]]
@@ -342,6 +342,8 @@ bloodpal <- c(TissuePal[2], 'black')
 names(bloodpal) <- c('yes', 'no')
 
 # alluvial plots
+clonePal2 <- clonePal
+names(clonePal2) <- gsub('Tfh_321-05_','',names(clonePal2)) %>% gsub('_',' ',.)
 picked_pl_all <- ggplot(data = new_pc_df,
        aes(x = time_point, 
            y = n, 
@@ -354,10 +356,11 @@ picked_pl_all <- ggplot(data = new_pc_df,
   theme_minimal()+
   labs(title = 'Cell numbers of clones picked for screening') +
   ylab('Number of cells') +
-  scale_fill_manual(values = clonePal) +
+  scale_fill_manual(values = clonePal2) +
   scale_color_manual(values = bloodpal) + 
   scale_y_continuous(limits = c(0,60), breaks = c(0,10,20,30,40,50,60))+
-  facet_wrap(~tissue, ncol = 1)
+  facet_wrap(~tissue, ncol = 1) +
+  labs(fill = 'TFH Clone ID')
 
 ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_clone_numbers_LN_PBMC.pdf', 
        plot = picked_pl_all,
@@ -378,8 +381,9 @@ picked_pl_FNA <- ggplot(data = filter(new_pc_df, tissue == 'FNA'),
        subtitle = paste0(unique(new_pc_df$donor), 
                          " FNA")) +
   ylab('Relative frequency for tissue and day') +
-  scale_fill_manual(values = clonePal) +
-  scale_color_manual(values = bloodpal)
+  scale_fill_manual(values = clonePal2) +
+  scale_color_manual(values = bloodpal)+
+  labs(fill = 'TFH Clone ID')
 
 ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_clone_freqs.pdf', 
        plot = picked_pl_FNA,
@@ -400,8 +404,9 @@ picked_pl_blood <- ggplot(data = PBMC_df,
                          " ", 
                          unique(PBMC_df$tissue))) +
   ylab('Relative frequency for tissue and day') +
-  scale_fill_manual(values = clonePal) +
-  scale_color_manual(values = bloodpal)
+  scale_fill_manual(values = clonePal2) +
+  scale_color_manual(values = bloodpal)+
+  labs(fill = 'TFH Clone ID')
 
 picked_pl_FNA_n <- ggplot(data = FNA_df,
                           aes(x = time_point, 
@@ -416,8 +421,9 @@ picked_pl_FNA_n <- ggplot(data = FNA_df,
   labs(title = 'Cell numbers of clones picked for cloning in FNA',
        subtitle = paste0(unique(FNA_df$donor), " ", unique(FNA_df$tissue))) +
   ylab('Number for tissue and day') +
-  scale_fill_manual(values = clonePal)+
-  scale_color_manual(values = bloodpal)
+  scale_fill_manual(values = clonePal2)+
+  scale_color_manual(values = bloodpal)+
+  labs(fill = 'TFH Clone ID')
 
 ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_clone_number.pdf', 
        plot = picked_pl_FNA_n,
@@ -427,8 +433,8 @@ ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_clone_number.pdf',
 
 
 
-hits <- c("Tfh_321-05_clone_1", "Tfh_321-05_clone_3",
-          "Tfh_321-05_clone_11", "Tfh_321-05_clone_12")
+hits <- c("clone 1", "clone 3","clone 6",
+          "clone 11", "clone 12")
 
 FNA_df <-FNA_df %>%
   mutate(flu_specific = ifelse(Tfh_clone_id %in% hits, Tfh_clone_id, 'other'))
@@ -448,7 +454,7 @@ picked_pl_hits <- ggplot(data = FNA_df,
                          " ", 
                          unique(FNA_df$tissue))) +
   ylab('Relative frequency for tissue and day') +
-  scale_fill_manual(values = clonePal) +
+  scale_fill_manual(values = clonePal2) +
   scale_color_manual(values = bloodpal)
 
 ggsave('./10x/outs/Set2_BothDonors_321-05_pickedClone_flu_specific_clone_freqs.pdf', 
@@ -464,7 +470,9 @@ pickedClone_seqs <- Clonedf %>%
   mutate(match_alpha = paste(va_gene, cdr3a, ja_gene, sep = ","),
          match_beta= paste(vb_gene, cdr3b, jb_gene, sep = ",")
   ) %>% #using vj genes + cdr3 to match
-  distinct_all() 
+  distinct_all()  %>%
+  mutate(Tfh_clone_id = gsub('Tfh_321-05_','',Tfh_clone_id)) %>% 
+  mutate(Tfh_clone_id = gsub('_',' ',Tfh_clone_id)) 
 
 # import bulk data
 
@@ -495,7 +503,7 @@ for (i in seq_along(bulk_d5_chains)){
     filter(match %in% patterns)
   colnames(d5_match)[17] <- match_chain
   
-  d5_match <- left_join( d5_match, select(pickedClone_seqs, c(match_chain, Tfh_clone_id) ) )
+  d5_match <- left_join( d5_match, select(pickedClone_seqs, match_chain, Tfh_clone_id ) )
   
   #plot
   
@@ -513,8 +521,9 @@ for (i in seq_along(bulk_d5_chains)){
     labs(subtitle = paste0(unique(d5_match$donor), " bulk ", 
                            chain)) +
     ylab('Relative frequency for tissue and day') +
-    scale_fill_manual(values = clonePal) +
-    geom_text(aes(label= tissue), y= label_y_pos, size=3.5, color="black")
+    scale_fill_manual(values = clonePal2) +
+    geom_text(aes(label= tissue), y= label_y_pos, size=3.5, color="black") +
+    labs(fill = 'TFH Clone ID')
   
   alluv_plots[[i]] <- alluv_pl
   match_dfs[[i]] <- d5_match
@@ -531,6 +540,126 @@ ggsave('./10x/outs/Set2_321-05_pickedClone_10x_and_bulk_TCRb.pdf',
        plot = pickedClone_alluvials,
        height = 13.5, width = 8, useDingbats = F)
 
+
+
+
+
+# fancy umap for fig 7 ====
+
+
+df <- FetchData( Tfh_obj, c('Tfh_clone_id','time', 'UMAP_1','UMAP_2','Tfh_type')) %>%
+  mutate(antigen = 
+           case_when(
+             Tfh_clone_id == 'Tfh_321-05_clone_1' ~ 'M2',
+             Tfh_clone_id == 'Tfh_321-05_clone_3' ~ 'M1',
+             Tfh_clone_id == 'Tfh_321-05_clone_6' ~ 'NA',
+             Tfh_clone_id == 'Tfh_321-05_clone_11' ~ 'HA',
+             Tfh_clone_id == 'Tfh_321-05_clone_12' ~ 'NP',
+             .default = 'Unknown'
+              )
+         )
+
+
+clone_lin_dfs <-list()
+
+for( i in seq(12)){
+  clone_in <- paste0('Tfh_321-05_clone_', i)
+  clone_lin_dfs[[i]] <- df %>%
+    filter(is.na(Tfh_clone_id) | Tfh_clone_id == clone_in)
+}
+
+
+
+clone_lin_plots <- list()
+
+p1 <- ggplot(df, aes(UMAP_1, UMAP_2, color = Tfh_type)) +
+  geom_point() +
+  theme_bw()  +
+  labs(fill = 'Time Point') +
+  theme(
+    axis.title = element_blank(), 
+    axis.text = element_blank(),
+    legend.position = 'none') +
+  scale_fill_manual(values = TimePal2)+
+  scale_color_manual(values = TfhPal) +
+  scale_x_continuous(limits=c((min(background[,'UMAP_1']) - 0.5),
+                              (max(background[,'UMAP_1']) + 0.5))) +
+  scale_y_continuous(limits=c((min(background[,'UMAP_2']) - 0.5),
+                              (max(background[,'UMAP_2']) + 0.5)))
+
+
+background <- df %>% filter(is.na(Tfh_clone_id))
+lineage <- df %>% filter(!is.na(Tfh_clone_id))
+
+
+p2 <- ggplot(df, aes(UMAP_1, UMAP_2)) +
+  geom_density_2d(data = background, aes(color =Tfh_type), binwidth = 0.01)+
+  geom_point(data = lineage, aes(fill =Tfh_clone_id), color = 'white', size = 3, shape = 21) +
+  theme_bw()  +
+  labs(fill = 'Time Point') +
+  theme(
+    axis.title = element_blank(), 
+    axis.text = element_blank(),
+    legend.position = 'none') +
+  scale_fill_manual(values = clonePal)+
+  scale_color_manual(values = TfhPal) +
+  scale_x_continuous(limits=c((min(background[,'UMAP_1']) - 0.5),
+                              (max(background[,'UMAP_1']) + 0.5))) +
+  scale_y_continuous(limits=c((min(background[,'UMAP_2']) - 0.5),
+                              (max(background[,'UMAP_2']) + 0.5)))
+
+clone_lin_plots <- list(p1, p2, plot_spacer(),plot_spacer(),plot_spacer(),plot_spacer())
+
+
+for (i in seq_along(clone_lin_dfs)){
+  p_index <- length(clone_lin_plots) + 1
+  background <- clone_lin_dfs[[i]] %>% filter(is.na(Tfh_clone_id))
+  lineage <- clone_lin_dfs[[i]] %>% filter(!is.na(Tfh_clone_id))
+  
+  p <- ggplot(clone_lin_dfs[[i]], aes(UMAP_1, UMAP_2)) +
+    geom_density_2d(data = background, aes(color =Tfh_type), binwidth = 0.01)+
+    geom_point(data = lineage, aes(fill =time), color = 'white', size = 5, shape = 21) +
+    theme_bw()  +
+    labs(fill = 'Time Point') +
+    theme(
+      axis.title = element_blank(), 
+      axis.text = element_blank(),
+      legend.position = 'none') +
+    scale_fill_manual(values = TimePal2)+
+    scale_color_manual(values = TfhPal) +
+    labs(title=paste0('Clone ',i), 
+         subtitle = unique(lineage$antigen))+
+    scale_x_continuous(limits=c((min(background[,'UMAP_1']) - 0.5),
+                                (max(background[,'UMAP_1']) + 0.5))) +
+    scale_y_continuous(limits=c((min(background[,'UMAP_2']) - 0.5),
+                                (max(background[,'UMAP_2']) + 0.5)))
+  
+  clone_lin_plots[[p_index]] <- p
+}
+
+lineage_umaps <- wrap_plots(clone_lin_plots, ncol = 6)
+
+ggsave('./10x/outs/Set2_321-05_pickedClone_Tfh_gex_umap_v2.pdf', 
+       plot = lineage_umaps,
+       height = 9, width = 18, useDingbats = F)
+ggsave('./10x/outs/Set2_321-05_pickedClone_Tfh_gex_umap_v2.png', 
+       plot = lineage_umaps,
+       height = 9, width = 18)
+
+legend_donor <- ggplot(df, aes(UMAP_1, UMAP_2)) +
+  geom_point(data = filter(df, is.na(Tfh_clone_id)), aes(color =Tfh_type), alpha = 0.05)+
+  geom_point(data = filter(df, !is.na(Tfh_clone_id)), aes(fill =time), color = 'white', size = 5, shape = 21) +
+  theme_minimal()  +
+  labs(fill = 'Time Point') +
+  theme(
+        axis.title = element_blank(), 
+        axis.text = element_blank()) +
+  scale_fill_manual(values = TimePal2)+
+  scale_color_manual(values = TfhPal)
+
+ggsave('./10x/outs/Set2_321-05_pickedClone_Tfh_gex_umap_legend_donor.pdf', 
+       plot = legend_donor,
+       height = 5, width = 5, useDingbats = F)
 
 ### Not run ====
 # long version

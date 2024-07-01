@@ -59,12 +59,12 @@ donor_dfs <- clone_df[[1]] %>%
   group_split()
 
 
-donor_dfs[[3]]$donor <- case_when(
-  donor_dfs[[3]]$clone_id %in% donor_dfs[[1]]$clone_id ~ unique(donor_dfs[[1]]$donor),
-  donor_dfs[[3]]$clone_id %in% donor_dfs[[2]]$clone_id ~ unique(donor_dfs[[2]]$donor),
-  donor_dfs[[3]]$clone_id %in% donor_dfs[[2]]$clone_id & donor_dfs[[3]]$clone_id %in% donor_dfs[[1]]$clone_id ~ 'twodonor',
-  .default = NA
-)
+# donor_dfs[[3]]$donor <- case_when(
+#   donor_dfs[[3]]$clone_id %in% donor_dfs[[1]]$clone_id ~ unique(donor_dfs[[1]]$donor),
+#   donor_dfs[[3]]$clone_id %in% donor_dfs[[2]]$clone_id ~ unique(donor_dfs[[2]]$donor),
+#   donor_dfs[[3]]$clone_id %in% donor_dfs[[2]]$clone_id & donor_dfs[[3]]$clone_id %in% donor_dfs[[1]]$clone_id ~ 'twodonor',
+#   .default = NA
+# )
 
 
 fixed_new_donor <- do.call(bind_rows, donor_dfs) %>%

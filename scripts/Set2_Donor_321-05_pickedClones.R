@@ -97,10 +97,11 @@ Tfh_clones$vdjdb_MHCII_match_CDR3b <- ifelse(Tfh_clones$cdr3b %in% vdjdb_II_TRB$
 #nice pickedclones table ====
 ag_specific <- c('Tfh_321-05_clone_1', 
                  'Tfh_321-05_clone_3', 
+                 'Tfh_321-05_clone_6', 
                  'Tfh_321-05_clone_11', 
                  'Tfh_321-05_clone_12')
 
-Tfh_clones$confirmed_flu_specific <- ifelse(Tfh_clones$clone_id %in% ag_specific, 'yes', 'no')
+Tfh_clones$confirmed_flu_specific <- ifelse(Tfh_clones$Tfh_clone_id %in% ag_specific, 'yes', 'no')
 
 
 write_csv( Tfh_clones, "./10x/outs/Set2_Donor_321-05_pickedClones_annotated.csv")

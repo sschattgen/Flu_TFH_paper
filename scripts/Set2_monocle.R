@@ -11,7 +11,8 @@ Tfh_obj <- readRDS(Set2_integrated_Tfh_path )
 cds <- readRDS('./10x/objects/intergrated_TFH_lymNode_monocle.rds')
 
 # rerun harmony ====
-Tfh_cluster <- subset(Tfh_obj, subset = Tfh_type !='Treg' & tissue =='FNA')
+Tfh_cluster <- subset(Tfh_obj, subset = Tfh_type %notin% c('Treg','high ISG','cycling')
+                      & tissue =='FNA')
 
 Tfh_cluster <- Tfh_cluster %>% 
   FindVariableFeatures() 
@@ -21,13 +22,18 @@ pc_genes <- VariableFeatures(Tfh_cluster)[
 
 Tfh_cluster <- RunPCA(Tfh_cluster, features = pc_genes, npcs = 50) 
 
+Tfh_cluster@meta.data$donor <-  as.character(Tfh_cluster@meta.data$donor)
 
 Tfh_cluster_harmonized <- RunHarmony(Tfh_cluster, 
                                      assay.use = "SCT", 
-                                     group.by.vars = c("dataset","donor")) %>%
-  RunUMAP(., dims=1:50, reduction = "harmony") %>%
-  FindNeighbors(., reduction = "harmony") %>% 
-  FindClusters(., resolution = 0.9)
+                                     group.by.vars = c("dataset","donor",'time'))
+
+
+Tfh_cluster_harmonized <- Tfh_cluster_harmonized %>%
+  RunUMAP(., dims=1:10, reduction = "harmony") %>%
+  FindNeighbors(., reduction = "harmony")
+  
+Tfh_cluster_harmonized <-  FindClusters(Tfh_cluster_harmonized, resolution = 0.6)
 
 Tfh_cluster_harmonized@meta.data$ident <- Tfh_cluster_harmonized@active.ident
 
@@ -50,11 +56,14 @@ cds@int_colData@listData[["reducedDims"]]@listData[["UMAP"]] <- Tfh_cluster_harm
 
 
 
-cluster.before.traj <-plot_cells(cds, color_cells_by = "cluster", label_groups_by_cluster = F, 
-                                 group_label_size = 5) + theme(legend.position = "right")
+cluster.before.traj <- plot_cells(cds, 
+                                 color_cells_by = "cluster", 
+                                 label_groups_by_cluster = F, 
+                                 group_label_size = 5) + 
+  theme(legend.position = "right")
 
 
-cds <- learn_graph(cds, use_partition = F)
+cds <- learn_graph(cds)
 cds <- order_cells(cds)
 
 
@@ -62,7 +71,7 @@ cds <- order_cells(cds)
 # OR skip here and reload ======
 
 
-cds <- readRDS('./10x/objects/intergrated_TFH_lymNode_monocle.rds')
+#cds <- readRDS('./10x/objects/intergrated_TFH_lymNode_monocle.rds')
 
 #plots====
 p1 <- plot_cells(cds, color_cells_by = "pseudotime", 
@@ -140,15 +149,16 @@ cds$monocle3_pseudotime <- pseudotime(cds)
 data.pseudo <- as.data.frame(colData(cds))
 
 
-example_genes <- c('CCR7','CXCR5','PDCD1','PVALB','TOX2','TCF7','MAP3K8','PRDM1','FOXB1','IL10')
+example_genes <- c('CCR7','CXCR5','PDCD1','PVALB','TOX2','IL21','MAP3K8','PRDM1','FOXB1','IL10')
 gex_data <- FetchData(Tfh_cluster_harmonized, slot = 'data', c('barcode', example_genes))
-data.pseudo2 <- left_join(data.pseudo, gex_data)
+data.pseudo2 <- left_join(data.pseudo, gex_data)%>%
+  filter(Tfh_type != 'naive')
 
 
 plot_df <- data.pseudo2 %>% 
   select(barcode, Tfh_type, monocle3_pseudotime, all_of(example_genes)) %>%
   pivot_longer(all_of(example_genes), names_to = 'gene', values_to = 'expression') %>%
-  mutate(gene = factor(gene, levels = example_genes))
+  mutate(gene = factor(gene, levels = example_genes)) 
 
 z1 <- ggplot(plot_df, aes(monocle3_pseudotime, expression)) + 
   geom_point(aes(color = Tfh_type), alpha = 0.3) + 
@@ -221,10 +231,12 @@ line_point <- data.pseudo4 %>%
   group_by(Tfh_type) %>%
   summarise(median(monocle3_pseudotime))
 
+line_point_c <- line_point[[2]]
+names(line_point_c) <- line_point[[1]]
 z4 <- ggplot(data.pseudo4, aes(monocle3_pseudotime)) + 
-  geom_vline(xintercept = line_point[[1,2]], color = TfhPal[2]) +
-  geom_vline(xintercept = line_point[[2,2]], color = TfhPal[3]) +
-  geom_vline(xintercept = line_point[[3,2]], color = TfhPal[1]) +
+  geom_vline(xintercept = line_point_c['pre/memory'], color = TfhPal[1]) +
+  geom_vline(xintercept = line_point_c['GC'], color = TfhPal[2]) +
+  geom_vline(xintercept = line_point_c['IL10 TFH'], color = TfhPal[3]) +
   geom_density(aes(color = year, fill = year), adjust = 2, linewidth = 1, alpha = 0.3) + 
   #geom_histogram(position = position_stack()) + 
   facet_wrap(~time_X, ncol =  1) + 
@@ -240,7 +252,7 @@ ggsave('./10x/outs/Set2_monocle_d5_picked_time_point_density.pdf',
        plot = z4, width = 262/72, height = 575/72)
 
 
-z5 <-ggplot(data.pseudo, aes(monocle3_pseudotime)) + 
+z5 <-ggplot(data.pseudo2, aes(monocle3_pseudotime)) + 
   geom_density(aes(color = Tfh_type, fill = Tfh_type), adjust = 1, linewidth = 1, alpha = 0.3) + 
   #geom_histogram(position = position_stack()) + 
   theme_minimal() +
@@ -260,7 +272,5 @@ ggsave('./10x/outs/Set2_monocle_all_donor_types_density.pdf',
 # save monocle object ===
 
 saveRDS(cds,'./10x/objects/intergrated_TFH_lymNode_monocle.rds')
-
-
 
 

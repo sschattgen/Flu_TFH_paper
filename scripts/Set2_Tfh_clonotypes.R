@@ -4,7 +4,7 @@ setwd(tfh_working_dir)
 
 # import clone_df and Tfh obj ==== 
 Clonedf <- read.delim( clone_df_path , stringsAsFactors = F) %>%
-  mutate(Tfh_type2 = ifelse(is.na(Tfh_type) | Tfh_type =='Treg',NA, 'Tfh' )) %>%
+  mutate(Tfh_type2 = ifelse(Tfh_type %notin% c("GC","pre/memory","IL10 TFH", "high ISG","cycling") ,NA, 'Tfh' )) %>%
   filter(donor %in% c('321-04','321-05')) %>%
   mutate(time_point = factor(time_point, level=names(TimePal2)))
 

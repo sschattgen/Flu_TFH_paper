@@ -1,7 +1,7 @@
 source('Z:/ResearchHome/Groups/thomagrp/home/sschattg/bioinformatics_projects/Ali_Tfh/scripts/tfh_pkgs_paths_vars.R')
 setwd(tfh_working_dir)
 rename <- dplyr::rename
-Bcells <-readRDS( Bcells_path)
+Bcells <- readRDS( Bcells_path)
 Tcells <- readRDS( Set2_integrated_Tcells_path )
 Tfh_only <- readRDS( Set2_integrated_Tfh_path )
 Tfh_only@meta.data$Tfh_type2 <- ifelse(Tfh_only@meta.data$Tfh_type !='GC',NA, 'Tfh' )
@@ -95,3 +95,5 @@ ggsave('./10x/outs/Set2_GC_vs_Tfh_corr_heatmap.pdf',
 
 
 write_csv(wdf, './10x/outs/TwoYear_LN_Bcell_vs_Tfh_freq_time.csv')
+
+#
